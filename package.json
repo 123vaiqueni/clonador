@@ -1,0 +1,19 @@
+{
+  "name": "clonador",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Clona páginas pela URL para modelar ofertas estrangeiras para Angola.",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "archiver": "8.0.0",
+    "express": "5.2.1",
+    "playwright": "1.63.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

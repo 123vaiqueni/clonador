@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clonador — entrar</title>
+  <meta name="theme-color" content="#e8590c">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="login">
+    <div class="marca" style="margin-bottom:18px"><img src="/icon.svg" alt=""> Clonador</div>
+    <form class="caixa" id="f">
+      <input type="password" id="senha" placeholder="Senha" required autofocus autocomplete="current-password">
+      <button class="principal" type="submit">Entrar</button>
+      <div class="estado erro" id="erro"></div>
+    </form>
+  </div>
+  <script>
+    document.getElementById('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ senha: document.getElementById('senha').value }),
+      });
+      if (r.ok) location.href = '/';
+      else document.getElementById('erro').textContent = (await r.json().catch(() => ({}))).erro || 'Não consegui entrar.';
+    });
+  </script>
+</body>
+</html>

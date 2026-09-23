@@ -1,0 +1,109 @@
+:root {
+  --bg: #f6f5f2;
+  --card: #ffffff;
+  --ink: #1b1a17;
+  --muted: #6b6860;
+  --line: #e4e1da;
+  --accent: #e8590c;
+  --accent-ink: #ffffff;
+  --danger: #c92a2a;
+  --ok: #2b8a3e;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141412;
+    --card: #1e1d1a;
+    --ink: #f1efe9;
+    --muted: #a09c92;
+    --line: #34322d;
+    --accent: #ff7a2e;
+    --accent-ink: #1b1006;
+    --danger: #ff6b6b;
+    --ok: #69db7c;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+.marca img { width: 30px; height: 30px; border-radius: 8px; }
+.sub { color: var(--muted); font-size: 13px; }
+button, .btn {
+  font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  padding: 9px 14px; border-radius: 10px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+button:hover, .btn:hover { border-color: var(--muted); }
+button.principal { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.principal:disabled { opacity: .6; cursor: wait; }
+button.perigo { color: var(--danger); }
+button.link { border: 0; background: none; color: var(--muted); padding: 6px; }
+.caixa { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.linha-url { display: flex; gap: 8px; }
+input[type=url], input[type=password] {
+  flex: 1; min-width: 0; font: inherit; padding: 11px 13px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.opcoes { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; color: var(--muted); font-size: 14px; }
+.opcoes label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg input { display: none; }
+.seg span { padding: 6px 12px; cursor: pointer; }
+.seg input:checked + span { background: var(--ink); color: var(--bg); }
+.estado { margin-top: 12px; font-size: 14px; min-height: 20px; }
+.estado.erro { color: var(--danger); }
+.estado.ok { color: var(--ok); }
+h2 { font-size: 15px; margin: 28px 0 12px; color: var(--muted); font-weight: 600; }
+.grelha { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.clone { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+.clone .thumb { aspect-ratio: 4 / 3; background: var(--bg) center top / cover no-repeat; border-bottom: 1px solid var(--line); display: block; }
+.clone .corpo { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.clone .titulo { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.clone .origem { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clone .accoes { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.clone .accoes .btn, .clone .accoes button { padding: 6px 10px; font-size: 13px; }
+.vazio { color: var(--muted); text-align: center; padding: 36px 12px; border: 1px dashed var(--line); border-radius: 14px; }
+.giro { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: g .7s linear infinite; vertical-align: -2px; }
+@keyframes g { to { transform: rotate(360deg); } }
+dialog {
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto;
+  border: 1px solid var(--line); border-radius: 16px; padding: 18px; background: var(--card); color: var(--ink);
+}
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+.dlg-topo { display: flex; justify-content: space-between; align-items: center; font-size: 17px; }
+.dlg-sub { color: var(--muted); font-size: 13px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+dialog h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; }
+.px-linha { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.px-linha code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.px-linha button { padding: 4px 10px; font-size: 13px; }
+.px-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); white-space: nowrap; }
+.px-tag.meu { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.px-ok { color: var(--ok); font-size: 13px; white-space: nowrap; }
+.px-aviso { color: var(--accent); font-size: 13px; white-space: nowrap; }
+.px-vazio { color: var(--muted); font-size: 13px; padding: 6px 0; }
+.px-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.px-form select, .px-form input, .px-form textarea {
+  font: inherit; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.px-form select { flex: 1 1 180px; }
+.px-form input { flex: 2 1 180px; min-width: 0; }
+.px-form textarea { flex: 1 1 100%; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.px-form button { flex: 0 0 auto; }
+.login { max-width: 360px; margin: 14vh auto 0; padding: 0 16px; }
+.login form { display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 520px) {
+  .linha-url { flex-direction: column; }
+  .linha-url button { justify-content: center; padding: 12px; }
+  .grelha { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .clone .accoes { gap: 4px; }
+}

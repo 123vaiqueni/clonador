@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Clonador</title>
+  <meta name="theme-color" content="#e8590c">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="marca"><img src="/icon.svg" alt=""> <div>Clonador<div class="sub">Minerar → clonar → modelar</div></div></div>
+      <button class="link" id="sair" title="Sair">Sair</button>
+    </header>
+
+    <form class="caixa" id="form">
+      <div class="linha-url">
+        <input type="url" id="url" placeholder="Cola aqui o link da oferta (https://…)" required autocomplete="off">
+        <button class="principal" id="botao" type="submit">Clonar</button>
+      </div>
+      <div class="opcoes">
+        <span class="seg" title="Como a página é aberta ao clonar">
+          <label><input type="radio" name="formato" value="telemovel" checked><span>📱 Telemóvel</span></label>
+          <label><input type="radio" name="formato" value="computador"><span>💻 Computador</span></label>
+        </span>
+        <label title="Mantém os scripts do site original (sliders, contadores, vídeos). Também mantém os pixels deles.">
+          <input type="checkbox" id="scripts"> Manter scripts
+        </label>
+        <label title="Tira janelas de cookies, newsletter e escolha de país que ficariam presas na cópia.">
+          <input type="checkbox" id="popups" checked> Tirar popups
+        </label>
+      </div>
+      <div class="estado" id="estado"></div>
+    </form>
+
+    <h2 id="titulo-lista">Páginas clonadas</h2>
+    <div class="grelha" id="lista"></div>
+  </div>
+
+  <dialog id="dlg-pixels">
+    <div class="dlg-topo">
+      <strong>Pixels</strong>
+      <button class="link" data-fechar aria-label="Fechar">✕</button>
+    </div>
+    <div class="dlg-sub" id="px-titulo"></div>
+
+    <h3>Na página original</h3>
+    <div id="px-originais"></div>
+
+    <h3>Os teus pixels</h3>
+    <div id="px-meus"></div>
+
+    <form id="px-form" class="px-form">
+      <select id="px-plataforma">
+        <option value="meta">Meta (Facebook/Instagram)</option>
+        <option value="tiktok">TikTok</option>
+        <option value="google">Google Ads / Analytics</option>
+        <option value="gtm">Google Tag Manager</option>
+        <option value="kwai">Kwai</option>
+        <option value="pinterest">Pinterest</option>
+        <option value="snapchat">Snapchat</option>
+        <option value="utmify">Utmify</option>
+        <option value="clarity">Microsoft Clarity</option>
+        <option value="personalizado">Código personalizado…</option>
+      </select>
+      <input id="px-id" placeholder="ID do pixel" autocomplete="off">
+      <textarea id="px-codigo" rows="5" placeholder="Cola aqui o código completo (&lt;script&gt;…&lt;/script&gt;)" hidden></textarea>
+      <button class="principal" type="submit">Adicionar</button>
+    </form>
+    <div class="estado" id="px-estado"></div>
+  </dialog>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const estado = $('#estado');
+
+    function mostrar(msg, tipo = '') {
+      estado.className = 'estado ' + tipo;
+      estado.innerHTML = msg;
+    }
+
+    async function api(caminho, opts = {}) {
+      const r = await fetch(caminho, { headers: { 'content-type': 'application/json' }, ...opts });
+      if (r.status === 401) { location.href = '/login'; throw new Error('sessão'); }
+      const dados = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(dados.erro || 'Algo correu mal.');
+      return dados;
+    }
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const tamanho = (b) => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+
+    async function carregar() {
+      const lista = await api('/api/clones');
+      $('#titulo-lista').textContent = `Páginas clonadas (${lista.length})`;
+      if (!lista.length) {
+        $('#lista').innerHTML = '<div class="vazio" style="grid-column:1/-1">Ainda não clonaste nenhuma página. Cola um link em cima.</div>';
+        return;
+      }
+      $('#lista').innerHTML = lista.map((c) => `
+        <div class="clone">
+          <a class="thumb" href="/p/${c.id}/" target="_blank" style="background-image:url('/p/${c.id}/thumb.jpg')"></a>
+          <div class="corpo">
+            <div class="titulo">${esc(c.titulo)}</div>
+            <div class="origem" title="${esc(c.url)}">${esc(new URL(c.url).hostname)} · ${c.formato === 'computador' ? '💻' : '📱'} · ${tamanho(c.bytes)}</div>
+            <div class="accoes">
+              <a class="btn" href="/p/${c.id}/" target="_blank">Abrir</a>
+              <button data-pixels="${c.id}">Pixels${(c.meusPixels || []).length ? ` (${c.meusPixels.length})` : ''}</button>
+              <button data-copiar="${c.id}">Link</button>
+              <a class="btn" href="/api/clones/${c.id}/zip">ZIP</a>
+              <button class="perigo" data-apagar="${c.id}">Apagar</button>
+            </div>
+          </div>
+        </div>`).join('');
+    }
+
+    $('#form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const botao = $('#botao');
+      botao.disabled = true;
+      const inicio = Date.now();
+      mostrar('<span class="giro"></span> A abrir a página e a copiar tudo… (pode levar até 1 minuto)');
+      try {
+        const c = await api('/api/clones', {
+          method: 'POST',
+          body: JSON.stringify({
+            url: $('#url').value.trim(),
+            formato: document.querySelector('input[name=formato]:checked').value,
+            manterScripts: $('#scripts').checked,
+            removerPopups: $('#popups').checked,
+          }),
+        });
+        mostrar(`✓ Clonada em ${Math.round((Date.now() - inicio) / 1000)}s — ${c.ficheiros} ficheiros. <a href="/p/${c.id}/" target="_blank">Abrir</a>`, 'ok');
+        $('#url').value = '';
+        carregar();
+      } catch (err) {
+        mostrar(esc(err.message), 'erro');
+      } finally {
+        botao.disabled = false;
+      }
+    });
+
+    $('#lista').addEventListener('click', async (e) => {
+      const apagar = e.target.closest('[data-apagar]');
+      const copiar = e.target.closest('[data-copiar]');
+      if (apagar && confirm('Apagar esta página clonada? O link deixa de funcionar.')) {
+        await api('/api/clones/' + apagar.dataset.apagar, { method: 'DELETE' });
+        carregar();
+      }
+      if (copiar) {
+        const link = `${location.origin}/p/${copiar.dataset.copiar}/`;
+        try { await navigator.clipboard.writeText(link); copiar.textContent = 'Copiado ✓'; }
+        catch { prompt('Copia o link:', link); }
+        setTimeout(() => { copiar.textContent = 'Link'; }, 1500);
+      }
+    });
+
+    // ── Pixels
+    const NOMES = {
+      meta: 'Meta', tiktok: 'TikTok', google: 'Google', gtm: 'Tag Manager', kwai: 'Kwai',
+      pinterest: 'Pinterest', snapchat: 'Snapchat', utmify: 'Utmify', clarity: 'Clarity', personalizado: 'Personalizado',
+    };
+    const dlg = $('#dlg-pixels');
+    let atual = null;
+
+    function pxEstado(msg, tipo = '') {
+      $('#px-estado').className = 'estado ' + tipo;
+      $('#px-estado').textContent = msg;
+    }
+
+    function desenharPixels() {
+      $('#px-titulo').textContent = atual.titulo;
+      const orig = atual.pixelsOriginais || [];
+      $('#px-originais').innerHTML = orig.length ? orig.map((p) => `
+        <div class="px-linha">
+          <span class="px-tag">${NOMES[p.plataforma] || p.plataforma}</span>
+          <code>${esc(p.id)}</code>
+          ${p.estado === 'removido' ? '<span class="px-ok">removido ✓</span>'
+            : p.estado === 'via-gtm' ? '<span class="px-aviso" title="Não está escrito na página — é carregado pelo Tag Manager. Remove o GTM.">vem pelo GTM</span>'
+            : `<button class="perigo" data-remover-orig="${esc(p.id)}">Remover</button>`}
+        </div>`).join('')
+        : '<div class="px-vazio">Nenhum pixel encontrado.</div>';
+
+      const meus = atual.meusPixels || [];
+      $('#px-meus').innerHTML = meus.length ? meus.map((p, i) => `
+        <div class="px-linha">
+          <span class="px-tag meu">${NOMES[p.plataforma]}</span>
+          <code>${esc(p.plataforma === 'personalizado' ? (p.codigo.slice(0, 40) + (p.codigo.length > 40 ? '…' : '')) : p.id)}</code>
+          <button class="perigo" data-tirar-meu="${i}">Tirar</button>
+        </div>`).join('')
+        : '<div class="px-vazio">Ainda não adicionaste nenhum. Entram na página publicada e no ZIP.</div>';
+    }
+
+    async function guardarMeus(lista) {
+      atual = await api(`/api/clones/${atual.id}/pixels`, { method: 'PUT', body: JSON.stringify({ meusPixels: lista }) });
+      desenharPixels();
+      carregar();
+    }
+
+    $('#px-plataforma').addEventListener('change', () => {
+      const perso = $('#px-plataforma').value === 'personalizado';
+      $('#px-id').hidden = perso;
+      $('#px-codigo').hidden = !perso;
+    });
+
+    $('#px-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const plataforma = $('#px-plataforma').value;
+      const novo = plataforma === 'personalizado'
+        ? { plataforma, codigo: $('#px-codigo').value }
+        : { plataforma, id: $('#px-id').value.trim() };
+      try {
+        await guardarMeus([...(atual.meusPixels || []), novo]);
+        $('#px-id').value = ''; $('#px-codigo').value = '';
+        pxEstado('✓ Pixel adicionado — já está na página publicada.', 'ok');
+      } catch (err) { pxEstado(err.message, 'erro'); }
+    });
+
+    dlg.addEventListener('click', async (e) => {
+      if (e.target === dlg || e.target.closest('[data-fechar]')) return dlg.close();
+      const tirar = e.target.closest('[data-tirar-meu]');
+      const remover = e.target.closest('[data-remover-orig]');
+      try {
+        if (tirar) {
+          const lista = [...atual.meusPixels];
+          lista.splice(Number(tirar.dataset.tirarMeu), 1);
+          await guardarMeus(lista);
+          pxEstado('Pixel tirado.', 'ok');
+        }
+        if (remover) {
+          const r = await api(`/api/clones/${atual.id}/pixels/remover`, { method: 'POST', body: JSON.stringify({ id: remover.dataset.removerOrig }) });
+          atual = r.meta;
+          desenharPixels();
+          pxEstado(r.removidos ? `✓ Removido (${r.removidos} bloco${r.removidos > 1 ? 's' : ''} de código).` : 'Não está escrito na página — vem pelo Tag Manager. Remove o GTM.', r.removidos ? 'ok' : 'erro');
+        }
+      } catch (err) { pxEstado(err.message, 'erro'); }
+    });
+
+    $('#lista').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-pixels]');
+      if (!b) return;
+      const lista = await api('/api/clones');
+      atual = lista.find((c) => c.id === b.dataset.pixels);
+      if (!atual) return;
+      pxEstado('');
+      desenharPixels();
+      dlg.showModal();
+    });
+
+    $('#sair').addEventListener('click', async () => {
+      await fetch('/api/logout', { method: 'POST' });
+      location.href = '/login';
+    });
+
+    // Partilhar um link para o app no telemóvel já preenche o campo.
+    const partilhado = new URLSearchParams(location.search).get('url') || new URLSearchParams(location.search).get('text');
+    if (partilhado) $('#url').value = (partilhado.match(/https?:\/\/\S+/) || [partilhado])[0];
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    carregar().catch((err) => mostrar(esc(err.message), 'erro'));
+  </script>
+</body>
+</html>
