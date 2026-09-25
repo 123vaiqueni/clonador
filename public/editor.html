@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Editor · Clonador</title>
+  <meta name="theme-color" content="#e8590c">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/editor.css">
+</head>
+<body class="ed">
+  <header class="ed-topo">
+    <a class="btn" href="/" title="Voltar à lista">←</a>
+    <div class="ed-nome" id="ed-nome">A carregar…</div>
+    <div class="ed-vista seg" title="Pré-visualizar como">
+      <label><input type="radio" name="vista" value="telemovel" checked><span>📱</span></label>
+      <label><input type="radio" name="vista" value="computador"><span>💻</span></label>
+    </div>
+    <button id="ed-repor" class="link" title="Desfazer todas as edições">Repor original</button>
+    <a class="btn" id="ed-abrir" target="_blank">Ver</a>
+    <button class="principal" id="ed-guardar">Guardar</button>
+  </header>
+
+  <nav class="ed-abas" id="ed-abas">
+    <button data-aba="texto" class="ativa">✏️ Texto</button>
+    <button data-aba="elemento">👆 Elemento</button>
+    <button data-aba="cores">🎨 Cores</button>
+    <button data-aba="mobile">📱 Mobile</button>
+  </nav>
+
+  <main class="ed-corpo">
+    <div class="ed-palco" id="ed-palco">
+      <iframe id="ed-frame" title="Página em edição" sandbox="allow-same-origin"></iframe>
+    </div>
+
+    <aside class="ed-painel" id="ed-painel">
+      <!-- Texto -->
+      <section data-painel="texto">
+        <h3>Editar texto</h3>
+        <p class="ed-dica">Clica em qualquer texto da página e escreve por cima — títulos, parágrafos, botões, preços.</p>
+        <div class="ed-botoes-fmt">
+          <button data-cmd="bold" title="Negrito"><b>N</b></button>
+          <button data-cmd="italic" title="Itálico"><i>I</i></button>
+          <button data-cmd="underline" title="Sublinhado"><u>S</u></button>
+          <button data-cmd="strikeThrough" title="Riscado (preço antigo)"><s>R</s></button>
+          <label class="ed-cor-txt" title="Cor do texto seleccionado">A <input type="color" id="fmt-cor" value="#e03131"></label>
+        </div>
+        <p class="ed-dica">Dica: selecciona uma palavra para a pôr a negrito, riscar ou mudar de cor.</p>
+      </section>
+
+      <!-- Elemento -->
+      <section data-painel="elemento" hidden>
+        <h3>Elemento</h3>
+        <p class="ed-dica" id="el-vazio">Clica numa imagem, botão ou bloco da página.</p>
+        <div id="el-opcoes" hidden>
+          <div class="ed-tag" id="el-tipo"></div>
+          <div class="ed-subir">
+            <button id="el-pai" title="Seleccionar o bloco à volta">⬆ Bloco à volta</button>
+          </div>
+
+          <div id="el-imagem" class="ed-grupo" hidden>
+            <h4>Imagem</h4>
+            <img id="el-img-previa" alt="">
+            <label class="btn ed-upload">📤 Enviar imagem<input type="file" id="el-img-ficheiro" accept="image/*" hidden></label>
+            <input id="el-img-url" placeholder="…ou cola o link de uma imagem">
+          </div>
+
+          <div id="el-link" class="ed-grupo" hidden>
+            <h4>Ao clicar</h4>
+            <input id="el-href" placeholder="https://… (checkout, WhatsApp)">
+            <button id="el-ancora" type="button">⚓ Deslizar até uma secção da página</button>
+            <p class="ed-dica" id="el-ancora-info"></p>
+          </div>
+
+          <div class="ed-grupo">
+            <h4>Cores</h4>
+            <div class="ed-cores-el">
+              <label>Texto <input type="color" id="el-cor"></label>
+              <label>Fundo <input type="color" id="el-fundo"></label>
+            </div>
+          </div>
+
+          <div class="ed-grupo ed-accoes">
+            <button id="el-esconder">🙈 Esconder</button>
+            <button id="el-duplicar">⧉ Duplicar</button>
+            <button id="el-apagar" class="perigo">🗑 Apagar</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cores -->
+      <section data-painel="cores" hidden>
+        <h3>Paleta da página</h3>
+        <p class="ed-dica">As cores mais usadas. Muda uma e ela é trocada em toda a página (fundos, botões, textos, bordas).</p>
+        <div id="cores-lista" class="ed-paleta"></div>
+        <button class="principal" id="cores-aplicar" disabled>Aplicar cores</button>
+      </section>
+
+      <!-- Mobile -->
+      <section data-painel="mobile" hidden>
+        <h3>Otimizar para telemóvel</h3>
+        <p class="ed-dica">Corrige o que costuma partir no telemóvel: página a fugir para o lado, imagens e vídeos maiores que o ecrã, títulos gigantes, botões pequenos.</p>
+        <label class="ed-interruptor"><input type="checkbox" id="mob-ativo"> Otimização automática ligada</label>
+        <p class="ed-dica">Usa o 📱 lá em cima para ver como fica. Se um bloco continuar mal, esconde-o no separador Elemento.</p>
+      </section>
+
+      <div class="estado" id="ed-estado"></div>
+    </aside>
+  </main>
+
+  <input type="file" id="ficheiro-geral" hidden>
+  <script src="/editor.js"></script>
+</body>
+</html>

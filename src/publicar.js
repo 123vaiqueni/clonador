@@ -35,7 +35,7 @@ export async function zipEmMemoria(pasta, htmlFinal, redirects = '') {
   zip.pipe(saida);
   zip.append(htmlFinal, { name: 'index.html' });
   if (redirects) zip.append(redirects, { name: '_redirects' });
-  zip.glob('**/*', { cwd: pasta, ignore: ['meta.json', 'thumb.jpg', 'index.html'] });
+  zip.glob('**/*', { cwd: pasta, ignore: ['meta.json', 'thumb.jpg', 'index.html', 'index.original.html', 'original/**'] });
   await zip.finalize();
   await fim;
   return Buffer.concat(partes);

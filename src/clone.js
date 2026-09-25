@@ -14,6 +14,9 @@ import { detectarPixels, removerPixel } from './pixels.js';
 const MAX_ASSET_BYTES = 15 * 1024 * 1024;   // vídeos grandes ficam no site original
 const MAX_TOTAL_BYTES = 150 * 1024 * 1024;
 const TIPOS_GUARDADOS = new Set(['stylesheet', 'image', 'font', 'media']);
+const TIPOS_APP = new Set(['script', 'fetch', 'xhr', 'manifest', 'other']);
+// Nomes que a pasta da página já usa — um ficheiro do site com estes nomes não é espelhado.
+const NOMES_NOSSOS = /^(index\.html|index\.original\.html|meta\.json|thumb\.jpg|original\/)/;
 
 let browserPromise = null;
 
@@ -275,6 +278,7 @@ const HOSTS_RASTREIO = [
   // avisos de cookies
   'cookiebot.com', 'cookielaw.org', 'onetrust.com', 'cookieyes.com', 'termly.io', 'usercentrics.eu', 'iubenda.com',
 ];
+const RE_HOSTS_RASTREIO = new RegExp(HOSTS_RASTREIO.filter((h) => !h.includes('/')).map((h) => h.replace(/\./g, '\\.')).join('|'), 'g');
 const RASTREIO_INLINE = /fbq\(|_fbq|ttq\.(load|page)|gtag\(|gtm\.js|GoogleAnalyticsObject|google-analytics|clarity\(|pintrk\(|snaptr\(|kwaiq|window\.pixelId|hotjar|_hjSettings|twq\(|_linkedin_partner_id|uetq|obApi|_tfa\.push|analytics\.load\(|mixpanel\.init/;
 
 function prepararOriginal({ hostsRastreio, rastreioInline }) {
@@ -295,11 +299,7 @@ function prepararOriginal({ hostsRastreio, rastreioInline }) {
     const txt = s.textContent || '';
     if (src && eRastreio(abs(src))) { s.remove(); rastreio++; continue; }
     if (!src && reInline.test(txt)) { s.remove(); rastreio++; continue; }
-    // Anti-clone: compara o domínio e manda o visitante de volta ao site original.
-    const olhaDominio = /location\.(hostname|host|origin)|document\.domain|document\.referrer/.test(txt);
-    const redirecciona = /location\.(href\s*=|replace|assign)|window\.location\s*=|top\.location|document\.location\s*=/.test(txt);
-    const ofuscado = /eval\(|atob\(|\\x[0-9a-f]{2}.*\\x[0-9a-f]{2}/i.test(txt) && /location/.test(txt);
-    if (!src && ((olhaDominio && redirecciona) || ofuscado)) { s.remove(); antiClone++; }
+    // Protecções anti-cópia do dono da página ficam como estão: não as contornamos.
   }
   for (const el of document.querySelectorAll('noscript, iframe, img, link')) {
     const u = el.getAttribute('src') || el.getAttribute('href') || el.innerHTML || '';
@@ -381,11 +381,15 @@ export async function clonar({ url, formato = 'telemovel', modo = 'movimento', r
   const pendentes = [];
   const pedidos = []; // todas as moradas pedidas — é por aqui que se apanham pixels carregados via GTM
   page.on('request', (req) => { if (pedidos.length < 3000) pedidos.push(req.url()); });
+  // Do próprio site guardamos também scripts e dados: é o que o modo "app"
+  // (páginas Lovable/React/Vite) precisa para voltar a correr na cópia.
+  const hostAlvo = new URL(alvo).hostname.replace(/^www\./, '');
+  const doSite = (u) => { try { return new URL(u).hostname.replace(/^www\./, '') === hostAlvo; } catch { return false; } };
   page.on('response', (resp) => {
     const req = resp.request();
-    if (!TIPOS_GUARDADOS.has(req.resourceType())) return;
-    if (resp.status() !== 200) return;
     const u = resp.url();
+    if (!TIPOS_GUARDADOS.has(req.resourceType()) && !(TIPOS_APP.has(req.resourceType()) && doSite(u))) return;
+    if (resp.status() !== 200) return;
     if (!/^https?:/.test(u) || capturados.has(u)) return;
     pendentes.push((async () => {
       try {
@@ -427,19 +431,26 @@ export async function clonar({ url, formato = 'telemovel', modo = 'movimento', r
     let removidos = { rastreio: 0, antiClone: 0 };
     let html = null;
     let info;
+    let routerApp = false;
     if (modo === 'movimento') {
       const bruto = await respostaPrincipal?.text().catch(() => null);
       const orig = bruto ? await htmlOriginalPreparado(browser, bruto, urlFinal).catch(() => null) : null;
-      // Páginas montadas só por JavaScript (quase vazias no HTML original) não dão
-      // para este modo — ficariam dependentes da API do dono. Vão como fotografia.
-      if (orig && orig.textoCorpo >= textoVisivel * 0.3) {
-        html = orig.html;
+      if (orig) {
+        // Os ficheiros do próprio site (scripts, CSS, imagens) ficam na cópia nos
+        // mesmos caminhos ("/assets/…"), que o servidor ajusta ao endereço publicado.
+        // Scripts "module" (Lovable, React, Vite) só correm assim: o browser recusa-os
+        // de outro domínio. Páginas quase vazias no HTML original (montadas toda por
+        // JavaScript) ficam como "app" — voltam a montar-se na cópia.
+        if (orig.textoCorpo < textoVisivel * 0.3) modoFinal = 'app';
         removidos = { rastreio: orig.rastreio, antiClone: orig.antiClone };
-        const imagens = [...html.matchAll(/<img\b[^>]*?\s(?:data-)?src="([^"]+)"/gi)].map((m) => m[1].replace(/&amp;/g, '&'));
+        const host = escaparRegex(new URL(urlFinal).hostname.replace(/^www\./, ''));
+        html = orig.html.replace(new RegExp(`https?://(?:www\\.)?${host}(?=/)`, 'gi'), '');
+        const imagens = [...html.matchAll(/<img\b[^>]*?\s(?:data-)?src="(https?:[^"]+)"/gi)].map((m) => m[1].replace(/&amp;/g, '&'));
         info = { title: await page.title().catch(() => ''), recursos: imagens };
+        routerApp = /type=["']module["']|__NEXT_DATA__|__remixContext|tanstack|data-reactroot|<div id="(root|app|__next)"/i.test(bruto);
       } else {
         modoFinal = 'estatica';
-        aviso = 'Esta página é montada toda por JavaScript — clonei-a como fotografia (sem movimento).';
+        aviso = 'Não consegui ler o código original desta página — clonei-a como fotografia (sem movimento).';
       }
     }
     if (html === null) {
@@ -452,7 +463,38 @@ export async function clonar({ url, formato = 'telemovel', modo = 'movimento', r
     page.removeAllListeners('response');
     // Fotografia da lista: respostas que ainda cheguem depois disto ficam de fora.
     const guardados = new Map(capturados);
+    // Primeiro o que falta (fontes, imagens de outros ecrãs); depois arrumamos tudo.
     await buscarEmFalta(context, guardados, html, urlFinal, info.recursos);
+
+    // Com movimento / app: os ficheiros do próprio site ficam espelhados no caminho original.
+    let spa = null;
+    if (modoFinal !== 'estatica') {
+      const segmentos = new Set();
+      for (const [u, a] of [...guardados]) {
+        if (!doSite(u)) continue;
+        let rel;
+        try { rel = decodeURIComponent(new URL(u).pathname).replace(/^\/+/, ''); } catch { continue; }
+        guardados.delete(u);
+        if (!rel || rel.endsWith('/') || rel.includes('..') || NOMES_NOSSOS.test(rel) || /[<>:"|?*\\]/.test(rel)) continue;
+        await mkdir(path.dirname(path.join(pasta, rel)), { recursive: true });
+        let conteudo = a.buf;
+        // Rastreadores metidos dentro do código da app (Utmify, pixel do Facebook…):
+        // o endereço deles deixa de existir, e o pedido morre sem partir a página.
+        if (/\.m?js$/i.test(rel)) {
+          const texto = a.buf.toString('utf8');
+          const limpo = texto.replace(RE_HOSTS_RASTREIO, 'rastreio-removido.invalid');
+          if (limpo !== texto) { conteudo = Buffer.from(limpo, 'utf8'); removidos.rastreio++; }
+        }
+        await writeFile(path.join(pasta, rel), conteudo);
+        segmentos.add(rel.split('/')[0]);
+        spa ||= { segmentos: [], caminho: new URL(urlFinal).pathname, router: routerApp, ficheiros: 0, bytes: 0 };
+        spa.ficheiros++;
+        spa.bytes += a.buf.length;
+      }
+      if (spa) spa.segmentos = [...new Set([...segmentos, 'assets'])];
+    }
+    // Scripts e dados só servem ao modo app.
+    for (const [u, a] of [...guardados]) if (TIPOS_APP.has(a.tipo)) guardados.delete(u);
 
     // Nome local para cada ficheiro capturado.
     const local = new Map();
@@ -461,7 +503,12 @@ export async function clonar({ url, formato = 'telemovel', modo = 'movimento', r
       local.set(u, `assets/${nome}`);
     }
     const semHash = (u) => u.split('#')[0];
-    const mapear = (abs) => local.get(abs) || local.get(semHash(abs)) || abs;
+    // Ficheiros do próprio site (espelhados) ficam com o caminho original "/…".
+    const doSiteRel = (abs) => { try { const u = new URL(abs); return spa && doSite(abs) ? u.pathname + u.search : null; } catch { return null; } };
+    const mapear = (abs) => {
+      const l = local.get(abs) || local.get(semHash(abs));
+      return l ? (spa ? '/' + l : l) : doSiteRel(abs) || abs;
+    };
 
     // CSS: os caminhos dentro do CSS são relativos à pasta assets/.
     for (const [u, a] of guardados) {
@@ -469,7 +516,7 @@ export async function clonar({ url, formato = 'telemovel', modo = 'movimento', r
       if (a.tipo === 'stylesheet' || a.contentType.includes('text/css')) {
         const css = reescreverCss(a.buf.toString('utf8'), u, (abs) => {
           const l = mapear(abs);
-          return l.startsWith('assets/') ? l.slice('assets/'.length) : l;
+          return l.replace(/^\/?assets\//, '');
         });
         conteudo = Buffer.from(css, 'utf8');
       }
@@ -485,7 +532,7 @@ export async function clonar({ url, formato = 'telemovel', modo = 'movimento', r
     });
     const urls = [...local.keys()].sort((a, b) => b.length - a.length);
     for (const u of urls) {
-      const destino = local.get(u);
+      const destino = spa ? '/' + local.get(u) : local.get(u);
       for (const variante of new Set([u, u.replace(/&/g, '&amp;')])) {
         html = html.replace(new RegExp(escaparRegex(variante) + '(?=["\'\\s,)])', 'g'), destino);
       }
@@ -504,8 +551,9 @@ export async function clonar({ url, formato = 'telemovel', modo = 'movimento', r
       removidos,
       pixelsOriginais,
       meusPixels: [],
-      ficheiros: guardados.size,
-      bytes: [...guardados.values()].reduce((s, a) => s + a.buf.length, 0),
+      spa,
+      ficheiros: guardados.size + (spa?.ficheiros || 0),
+      bytes: [...guardados.values()].reduce((s, a) => s + a.buf.length, 0) + (spa?.bytes || 0),
       criadoEm: new Date().toISOString(),
     };
     await writeFile(path.join(pasta, 'meta.json'), JSON.stringify(meta, null, 2));

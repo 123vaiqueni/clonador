@@ -206,7 +206,6 @@
         });
         const extra = [
           c.pixelsOriginais?.length ? `${c.pixelsOriginais.length} pixels deles removidos` : '',
-          c.removidos?.antiClone ? `${c.removidos.antiClone} script anti-clone removido` : '',
         ].filter(Boolean).join(' · ');
         mostrar(`✓ Clonada em ${Math.round((Date.now() - inicio) / 1000)}s — ${c.ficheiros} ficheiros${extra ? ' · ' + extra : ''}. <a href="/p/${c.id}/" target="_blank">Abrir</a>${c.aviso ? `<br><span class="px-aviso">${esc(c.aviso)}</span>` : ''}`, 'ok');
         $('#url').value = '';
