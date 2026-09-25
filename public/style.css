@@ -99,6 +99,29 @@ dialog h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; c
 .px-form input { flex: 2 1 180px; min-width: 0; }
 .px-form textarea { flex: 1 1 100%; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
 .px-form button { flex: 0 0 auto; }
+.publicado { font-size: 12px; color: var(--ok); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+dialog#dlg-links { width: min(720px, calc(100vw - 32px)); }
+.ln-todos, .ln-wa, .pb-linha { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+.ln-wa { font-size: 13px; color: var(--muted); }
+.ln-todos input, .ln-wa input, .pb-linha input, .ln-novo, .pb-campo {
+  font: inherit; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 0;
+}
+.ln-todos input { flex: 1 1 260px; }
+.ln-wa input { flex: 1 1 140px; }
+.ln-item { border-top: 1px solid var(--line); padding: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+.ln-item:first-child { margin-top: 12px; }
+.ln-item.checkout .px-tag { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.ln-cab { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ln-textos { font-size: 13px; color: var(--muted); }
+.ln-url { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ln-novo { width: 100%; }
+.dlg-rodape { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.dlg-rodape .estado { margin: 0; flex: 1; }
+.pb-prefixo { color: var(--muted); font-size: 14px; }
+.pb-linha input { flex: 1 1 160px; }
+.pb-campo { width: 100%; }
+.pb-ajuda { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+.pb-ajuda code, .px-linha code { background: var(--bg); padding: 1px 5px; border-radius: 5px; }
 .login { max-width: 360px; margin: 14vh auto 0; padding: 0 16px; }
 .login form { display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 520px) {

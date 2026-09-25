@@ -192,6 +192,7 @@ function prepararDom(manterScripts) {
   }
 
   document.querySelectorAll('base, meta[http-equiv="Content-Security-Policy" i]').forEach((el) => el.remove());
+  document.querySelectorAll('[integrity]').forEach((el) => el.removeAttribute('integrity'));
 
   if (!manterScripts) {
     // Sem scripts a página fica uma fotografia fiel: sem pixels do dono original,
@@ -261,6 +262,91 @@ async function buscarEmFalta(context, guardados, html, urlFinal, recursos) {
   }));
 }
 
+// ── Modo "com movimento" ─────────────────────────────────────────────
+// Usa o HTML ORIGINAL (antes de o JavaScript correr) e deixa os scripts da página
+// voltarem a correr na cópia — animações, sliders, contadores, vídeos. Tiramos só
+// o que não queremos: rastreio, avisos de cookies e scripts anti-clone.
+
+const HOSTS_RASTREIO = [
+  'connect.facebook.net', 'facebook.com/tr', 'googletagmanager.com', 'google-analytics.com', 'googleadservices.com',
+  'doubleclick.net', 'analytics.tiktok.com', 's.pinimg.com', 'ct.pinterest.com', 'sc-static.net', 'clarity.ms',
+  'static.hotjar.com', 'script.hotjar.com', 'utmify.com.br', 'kwai.net', 'snap.licdn.com', 'static.ads-twitter.com',
+  'bat.bing.com', 'cdn.taboola.com', 'amplify.outbrain.com', 'cdn.segment.com', 'cdn.mxpnl.com',
+  // avisos de cookies
+  'cookiebot.com', 'cookielaw.org', 'onetrust.com', 'cookieyes.com', 'termly.io', 'usercentrics.eu', 'iubenda.com',
+];
+const RASTREIO_INLINE = /fbq\(|_fbq|ttq\.(load|page)|gtag\(|gtm\.js|GoogleAnalyticsObject|google-analytics|clarity\(|pintrk\(|snaptr\(|kwaiq|window\.pixelId|hotjar|_hjSettings|twq\(|_linkedin_partner_id|uetq|obApi|_tfa\.push|analytics\.load\(|mixpanel\.init/;
+
+function prepararOriginal({ hostsRastreio, rastreioInline }) {
+  const reInline = new RegExp(rastreioInline);
+  const eRastreio = (u) => hostsRastreio.some((h) => (u || '').includes(h));
+  const abs = (v) => {
+    try { return new URL(v, document.baseURI).toString(); } catch { return v; }
+  };
+  const absSrcset = (v) => v.split(',').map((parte) => {
+    const [u, ...resto] = parte.trim().split(/\s+/);
+    return u ? [abs(u), ...resto].join(' ') : '';
+  }).filter(Boolean).join(', ');
+  let rastreio = 0;
+  let antiClone = 0;
+
+  for (const s of document.querySelectorAll('script')) {
+    const src = s.getAttribute('src');
+    const txt = s.textContent || '';
+    if (src && eRastreio(abs(src))) { s.remove(); rastreio++; continue; }
+    if (!src && reInline.test(txt)) { s.remove(); rastreio++; continue; }
+    // Anti-clone: compara o domínio e manda o visitante de volta ao site original.
+    const olhaDominio = /location\.(hostname|host|origin)|document\.domain|document\.referrer/.test(txt);
+    const redirecciona = /location\.(href\s*=|replace|assign)|window\.location\s*=|top\.location|document\.location\s*=/.test(txt);
+    const ofuscado = /eval\(|atob\(|\\x[0-9a-f]{2}.*\\x[0-9a-f]{2}/i.test(txt) && /location/.test(txt);
+    if (!src && ((olhaDominio && redirecciona) || ofuscado)) { s.remove(); antiClone++; }
+  }
+  for (const el of document.querySelectorAll('noscript, iframe, img, link')) {
+    const u = el.getAttribute('src') || el.getAttribute('href') || el.innerHTML || '';
+    if (eRastreio(u) && (el.tagName !== 'LINK' || /preconnect|dns-prefetch|preload/.test(el.rel))) el.remove();
+  }
+
+  // Tudo absoluto, incluindo os atributos das bibliotecas de "lazy load",
+  // senão os scripts iam procurar as imagens ao nosso domínio.
+  for (const el of document.querySelectorAll('*')) {
+    for (const at of Array.from(el.attributes)) {
+      const n = at.name;
+      if (n === 'src' || n === 'href' || n === 'poster' || n === 'action' ||
+        /^data-(src|lazy-src|original|bg|background|background-image|image|img|href|url|poster)$/.test(n)) {
+        if (!/^(#|javascript:|mailto:|tel:|data:)/i.test(at.value.trim()) && at.value.trim()) el.setAttribute(n, abs(at.value.trim()));
+      } else if (n === 'srcset' || n === 'data-srcset' || n === 'data-lazy-srcset') {
+        el.setAttribute(n, absSrcset(at.value));
+      }
+    }
+    // O CSS é reescrito, por isso a "assinatura" deixava de bater e o browser recusava-o.
+    el.removeAttribute('integrity');
+  }
+  document.querySelectorAll('base, meta[http-equiv="Content-Security-Policy" i]').forEach((el) => el.remove());
+
+  return {
+    html: '<!DOCTYPE html>\n' + document.documentElement.outerHTML,
+    textoCorpo: (document.body?.innerText || '').length,
+    rastreio,
+    antiClone,
+  };
+}
+
+async function htmlOriginalPreparado(browser, htmlBruto, urlFinal) {
+  // Página à parte, sem JavaScript e sem rede: só serve para mexer no HTML com segurança.
+  const ctx = await browser.newContext({ javaScriptEnabled: false });
+  try {
+    const p = await ctx.newPage();
+    await p.route('**/*', (r) => r.abort());
+    const comBase = /<head[^>]*>/i.test(htmlBruto)
+      ? htmlBruto.replace(/<head[^>]*>/i, (h) => `${h}<base href="${urlFinal.replace(/"/g, '&quot;')}">`)
+      : `<base href="${urlFinal.replace(/"/g, '&quot;')}">${htmlBruto}`;
+    await p.setContent(comBase, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    return await p.evaluate(prepararOriginal, { hostsRastreio: HOSTS_RASTREIO, rastreioInline: RASTREIO_INLINE.source });
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+}
+
 async function rolarAteAoFim(page) {
   await page.evaluate(async () => {
     const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -276,7 +362,7 @@ async function rolarAteAoFim(page) {
   });
 }
 
-export async function clonar({ url, formato = 'telemovel', manterScripts = false, removerPopups = true, dataDir }) {
+export async function clonar({ url, formato = 'telemovel', modo = 'movimento', removerPopups = true, dataDir }) {
   const alvo = await validarUrl(url);
   const id = `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
   const pasta = path.join(dataDir, 'pages', id);
@@ -314,7 +400,7 @@ export async function clonar({ url, formato = 'telemovel', manterScripts = false
   try {
     // Sites lentos não fazem falhar: basta o servidor ter respondido; o resto é
     // esperado com tolerância e seguimos com o que já estiver carregado.
-    await page.goto(alvo, { waitUntil: 'commit', timeout: 40000 });
+    const respostaPrincipal = await page.goto(alvo, { waitUntil: 'commit', timeout: 40000 });
     await page.waitForLoadState('domcontentloaded', { timeout: 40000 }).catch(() => {});
     await page.waitForLoadState('load', { timeout: 20000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
@@ -332,15 +418,36 @@ export async function clonar({ url, formato = 'telemovel', manterScripts = false
     const textoScripts = await page.evaluate(() => Array.from(document.querySelectorAll('script, noscript, iframe, img'),
       (el) => `${el.src || ''} ${el.tagName === 'SCRIPT' || el.tagName === 'NOSCRIPT' ? el.textContent : ''}`).join('\n')).catch(() => '');
     const pixelsOriginais = detectarPixels(`${textoScripts}\n${pedidos.join('\n')}`)
-      .map((p) => ({ ...p, estado: manterScripts ? 'ativo' : 'removido' }));
+      .map((p) => ({ ...p, estado: 'removido' }));
 
-    const info = await page.evaluate(prepararDom, manterScripts);
-    let html = await page.content();
     const urlFinal = page.url();
-    if (!manterScripts) {
-      // Restos fora dos scripts (imagens de 1px de rastreio com o ID).
-      for (const p of pixelsOriginais) html = removerPixel(html, p.id).html;
+    const textoVisivel = await page.evaluate(() => (document.body?.innerText || '').length).catch(() => 0);
+    let modoFinal = modo;
+    let aviso = '';
+    let removidos = { rastreio: 0, antiClone: 0 };
+    let html = null;
+    let info;
+    if (modo === 'movimento') {
+      const bruto = await respostaPrincipal?.text().catch(() => null);
+      const orig = bruto ? await htmlOriginalPreparado(browser, bruto, urlFinal).catch(() => null) : null;
+      // Páginas montadas só por JavaScript (quase vazias no HTML original) não dão
+      // para este modo — ficariam dependentes da API do dono. Vão como fotografia.
+      if (orig && orig.textoCorpo >= textoVisivel * 0.3) {
+        html = orig.html;
+        removidos = { rastreio: orig.rastreio, antiClone: orig.antiClone };
+        const imagens = [...html.matchAll(/<img\b[^>]*?\s(?:data-)?src="([^"]+)"/gi)].map((m) => m[1].replace(/&amp;/g, '&'));
+        info = { title: await page.title().catch(() => ''), recursos: imagens };
+      } else {
+        modoFinal = 'estatica';
+        aviso = 'Esta página é montada toda por JavaScript — clonei-a como fotografia (sem movimento).';
+      }
     }
+    if (html === null) {
+      info = await page.evaluate(prepararDom, false);
+      html = await page.content();
+    }
+    // Restos fora dos scripts (imagens de 1px de rastreio com o ID).
+    for (const p of pixelsOriginais) html = removerPixel(html, p.id).html;
     await Promise.allSettled(pendentes);
     page.removeAllListeners('response');
     // Fotografia da lista: respostas que ainda cheguem depois disto ficam de fora.
@@ -392,7 +499,9 @@ export async function clonar({ url, formato = 'telemovel', manterScripts = false
       urlFinal,
       titulo: info.title || new URL(urlFinal).hostname,
       formato,
-      manterScripts,
+      modo: modoFinal,
+      aviso,
+      removidos,
       pixelsOriginais,
       meusPixels: [],
       ficheiros: guardados.size,

@@ -27,9 +27,10 @@
           <label><input type="radio" name="formato" value="telemovel" checked><span>📱 Telemóvel</span></label>
           <label><input type="radio" name="formato" value="computador"><span>💻 Computador</span></label>
         </span>
-        <label title="Mantém os scripts do site original (sliders, contadores, vídeos). Também mantém os pixels deles.">
-          <input type="checkbox" id="scripts"> Manter scripts
-        </label>
+        <span class="seg" title="Com movimento: animações, sliders e contadores funcionam (sem os pixels deles). Estática: uma fotografia fiel, sem scripts.">
+          <label><input type="radio" name="modo" value="movimento" checked><span>✨ Com movimento</span></label>
+          <label><input type="radio" name="modo" value="estatica"><span>📷 Estática</span></label>
+        </span>
         <label title="Tira janelas de cookies, newsletter e escolha de país que ficariam presas na cópia.">
           <input type="checkbox" id="popups" checked> Tirar popups
         </label>
@@ -40,6 +41,60 @@
     <h2 id="titulo-lista">Páginas clonadas</h2>
     <div class="grelha" id="lista"></div>
   </div>
+
+  <dialog id="dlg-links">
+    <div class="dlg-topo">
+      <strong>Links e checkouts</strong>
+      <button class="link" data-fechar aria-label="Fechar">✕</button>
+    </div>
+    <div class="dlg-sub" id="ln-titulo"></div>
+    <div class="ln-todos">
+      <input id="ln-todos" placeholder="Colar o teu checkout para TODOS os botões de compra…" autocomplete="off">
+      <button id="ln-aplicar-todos" type="button">Aplicar a todos</button>
+    </div>
+    <div class="ln-wa">
+      <span>ou gerar link de WhatsApp:</span>
+      <input id="ln-wa-numero" placeholder="923 456 789" inputmode="tel">
+      <input id="ln-wa-msg" placeholder="Olá, quero o produto!" value="Olá, quero saber mais sobre o produto">
+      <button id="ln-wa-gerar" type="button">Gerar</button>
+    </div>
+    <div id="ln-lista"></div>
+    <div class="dlg-rodape">
+      <div class="estado" id="ln-estado"></div>
+      <button class="principal" id="ln-guardar" type="button">Guardar links</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-publicar">
+    <div class="dlg-topo">
+      <strong>Publicar</strong>
+      <button class="link" data-fechar aria-label="Fechar">✕</button>
+    </div>
+    <div class="dlg-sub" id="pb-titulo"></div>
+
+    <h3>1 · Link curto neste servidor</h3>
+    <div class="pb-linha">
+      <span class="pb-prefixo" id="pb-origem"></span>
+      <input id="pb-slug" placeholder="nome-da-oferta" autocomplete="off">
+    </div>
+
+    <h3>2 · Domínio próprio</h3>
+    <input id="pb-dominio" class="pb-campo" placeholder="minhaoferta.com (vazio = nenhum)" autocomplete="off">
+    <div class="pb-ajuda" id="pb-ajuda-dominio"></div>
+
+    <div class="dlg-rodape">
+      <div class="estado" id="pb-estado"></div>
+      <button class="principal" id="pb-guardar" type="button">Guardar</button>
+    </div>
+
+    <h3>3 · Domínio grátis (Netlify)</h3>
+    <div class="pb-linha">
+      <input id="pb-netlify" placeholder="nome-da-oferta" autocomplete="off">
+      <span class="pb-prefixo">.netlify.app</span>
+      <button id="pb-netlify-publicar" type="button">Publicar</button>
+    </div>
+    <div class="pb-ajuda" id="pb-netlify-info"></div>
+  </dialog>
 
   <dialog id="dlg-pixels">
     <div class="dlg-topo">
@@ -93,9 +148,21 @@
 
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const tamanho = (b) => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+    // O melhor endereço público da página: domínio próprio > Netlify > link curto > /p/id.
+    const urlPublica = (c) => c.dominios?.length ? `https://${c.dominios[0]}/`
+      : c.netlify?.url ? c.netlify.url
+      : c.slug ? `${location.origin}/${c.slug}/` : `${location.origin}/p/${c.id}/`;
+    const publicadoEm = (c) => {
+      const onde = [...(c.dominios || []), c.netlify?.url?.replace(/^https?:\/\//, ''), c.slug ? `/${c.slug}` : ''].filter(Boolean);
+      return onde.length ? `<div class="publicado">🌐 ${onde.map(esc).join(' · ')}</div>` : '';
+    };
+    let config = { netlify: false, ipServidor: '' };
+    fetch('/api/config').then((r) => r.json()).then((c) => { config = c; }).catch(() => {});
 
+    let ultimaLista = [];
     async function carregar() {
       const lista = await api('/api/clones');
+      ultimaLista = lista;
       $('#titulo-lista').textContent = `Páginas clonadas (${lista.length})`;
       if (!lista.length) {
         $('#lista').innerHTML = '<div class="vazio" style="grid-column:1/-1">Ainda não clonaste nenhuma página. Cola um link em cima.</div>';
@@ -106,11 +173,14 @@
           <a class="thumb" href="/p/${c.id}/" target="_blank" style="background-image:url('/p/${c.id}/thumb.jpg')"></a>
           <div class="corpo">
             <div class="titulo">${esc(c.titulo)}</div>
-            <div class="origem" title="${esc(c.url)}">${esc(new URL(c.url).hostname)} · ${c.formato === 'computador' ? '💻' : '📱'} · ${tamanho(c.bytes)}</div>
+            <div class="origem" title="${esc(c.url)}">${esc(new URL(c.url).hostname)} · ${c.formato === 'computador' ? '💻' : '📱'} · ${c.modo === 'estatica' ? '📷' : '✨'} · ${tamanho(c.bytes)}</div>
+            ${publicadoEm(c)}
             <div class="accoes">
-              <a class="btn" href="/p/${c.id}/" target="_blank">Abrir</a>
+              <a class="btn" href="${urlPublica(c)}" target="_blank">Abrir</a>
+              <button data-links="${c.id}">Links${(c.substituicoes || []).length ? ` (${c.substituicoes.length})` : ''}</button>
               <button data-pixels="${c.id}">Pixels${(c.meusPixels || []).length ? ` (${c.meusPixels.length})` : ''}</button>
-              <button data-copiar="${c.id}">Link</button>
+              <button class="principal" data-publicar="${c.id}">Publicar</button>
+              <button data-copiar="${c.id}">Copiar link</button>
               <a class="btn" href="/api/clones/${c.id}/zip">ZIP</a>
               <button class="perigo" data-apagar="${c.id}">Apagar</button>
             </div>
@@ -130,11 +200,15 @@
           body: JSON.stringify({
             url: $('#url').value.trim(),
             formato: document.querySelector('input[name=formato]:checked').value,
-            manterScripts: $('#scripts').checked,
+            modo: document.querySelector('input[name=modo]:checked').value,
             removerPopups: $('#popups').checked,
           }),
         });
-        mostrar(`✓ Clonada em ${Math.round((Date.now() - inicio) / 1000)}s — ${c.ficheiros} ficheiros. <a href="/p/${c.id}/" target="_blank">Abrir</a>`, 'ok');
+        const extra = [
+          c.pixelsOriginais?.length ? `${c.pixelsOriginais.length} pixels deles removidos` : '',
+          c.removidos?.antiClone ? `${c.removidos.antiClone} script anti-clone removido` : '',
+        ].filter(Boolean).join(' · ');
+        mostrar(`✓ Clonada em ${Math.round((Date.now() - inicio) / 1000)}s — ${c.ficheiros} ficheiros${extra ? ' · ' + extra : ''}. <a href="/p/${c.id}/" target="_blank">Abrir</a>${c.aviso ? `<br><span class="px-aviso">${esc(c.aviso)}</span>` : ''}`, 'ok');
         $('#url').value = '';
         carregar();
       } catch (err) {
@@ -152,10 +226,11 @@
         carregar();
       }
       if (copiar) {
-        const link = `${location.origin}/p/${copiar.dataset.copiar}/`;
+        const c = (ultimaLista || []).find((x) => x.id === copiar.dataset.copiar);
+        const link = c ? urlPublica(c) : `${location.origin}/p/${copiar.dataset.copiar}/`;
         try { await navigator.clipboard.writeText(link); copiar.textContent = 'Copiado ✓'; }
         catch { prompt('Copia o link:', link); }
-        setTimeout(() => { copiar.textContent = 'Link'; }, 1500);
+        setTimeout(() => { copiar.textContent = 'Copiar link'; }, 1500);
       }
     });
 
@@ -250,6 +325,137 @@
       desenharPixels();
       dlg.showModal();
     });
+
+    // ── Links
+    const dlgLinks = $('#dlg-links');
+    let links = [];
+    let paginaLinks = null;
+    const TIPO = { checkout: '💳', whatsapp: '💬', link: '🔗' };
+
+    function lnEstado(msg, tipo = '') { $('#ln-estado').className = 'estado ' + tipo; $('#ln-estado').textContent = msg; }
+
+    function desenharLinks() {
+      if (!links.length) {
+        $('#ln-lista').innerHTML = '<div class="px-vazio">Não encontrei botões de compra nem checkouts nesta página.</div>';
+        return;
+      }
+      $('#ln-lista').innerHTML = links.map((l, i) => `
+        <div class="ln-item ${l.tipo}">
+          <div class="ln-cab">
+            <span class="px-tag">${TIPO[l.tipo]} ${esc(l.plataforma)}</span>
+            <span class="ln-textos">${l.textos.map((t) => `“${esc(t)}”`).join(' ')}${l.ocorrencias > 1 ? ` · ${l.ocorrencias}×` : ''}</span>
+          </div>
+          <a class="ln-url" href="${esc(l.url)}" target="_blank" rel="noreferrer" title="${esc(l.url)}">${esc(l.url)}</a>
+          <input data-i="${i}" class="ln-novo" placeholder="Novo link (vazio = fica o original)" value="${esc(l.novo || '')}" autocomplete="off">
+        </div>`).join('');
+    }
+
+    $('#lista').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-links]');
+      if (!b) return;
+      paginaLinks = ultimaLista.find((c) => c.id === b.dataset.links);
+      $('#ln-titulo').textContent = paginaLinks?.titulo || '';
+      lnEstado('A procurar links…');
+      $('#ln-lista').innerHTML = '';
+      dlgLinks.showModal();
+      try {
+        links = await api(`/api/clones/${b.dataset.links}/links`);
+        lnEstado(`${links.filter((l) => l.tipo === 'checkout').length} checkouts · ${links.filter((l) => l.tipo === 'whatsapp').length} WhatsApp · ${links.filter((l) => l.tipo === 'link').length} outros botões`);
+        desenharLinks();
+      } catch (err) { lnEstado(err.message, 'erro'); }
+    });
+
+    $('#ln-lista').addEventListener('input', (e) => {
+      if (e.target.matches('.ln-novo')) links[e.target.dataset.i].novo = e.target.value.trim();
+    });
+
+    $('#ln-aplicar-todos').addEventListener('click', () => {
+      const v = $('#ln-todos').value.trim();
+      if (!v) return lnEstado('Cola primeiro o teu link.', 'erro');
+      let n = 0;
+      links.forEach((l) => { if (l.tipo !== 'link' || l.botao) { l.novo = v; n++; } });
+      desenharLinks();
+      lnEstado(`Aplicado a ${n} links — carrega em “Guardar links”.`, 'ok');
+    });
+
+    $('#ln-wa-gerar').addEventListener('click', async () => {
+      try {
+        const r = await api(`/api/whatsapp?numero=${encodeURIComponent($('#ln-wa-numero').value)}&mensagem=${encodeURIComponent($('#ln-wa-msg').value)}`);
+        $('#ln-todos').value = r.link;
+        lnEstado('Link de WhatsApp pronto — carrega em “Aplicar a todos” ou cola num link.', 'ok');
+      } catch (err) { lnEstado(err.message, 'erro'); }
+    });
+
+    $('#ln-guardar').addEventListener('click', async () => {
+      try {
+        const substituicoes = links.filter((l) => l.novo).map((l) => ({ de: l.url, para: l.novo }));
+        await api(`/api/clones/${paginaLinks.id}/links`, { method: 'PUT', body: JSON.stringify({ substituicoes }) });
+        lnEstado(`✓ ${substituicoes.length} link${substituicoes.length === 1 ? '' : 's'} trocado${substituicoes.length === 1 ? '' : 's'} — já está na página publicada.`, 'ok');
+        carregar();
+      } catch (err) { lnEstado(err.message, 'erro'); }
+    });
+
+    // ── Publicar
+    const dlgPub = $('#dlg-publicar');
+    let paginaPub = null;
+    function pbEstado(msg, tipo = '') { $('#pb-estado').className = 'estado ' + tipo; $('#pb-estado').textContent = msg; }
+
+    function desenharPub() {
+      const c = paginaPub;
+      $('#pb-titulo').textContent = c.titulo;
+      $('#pb-origem').textContent = location.host + '/';
+      $('#pb-slug').value = c.slug || '';
+      $('#pb-dominio').value = (c.dominios || []).join(', ');
+      $('#pb-netlify').value = c.netlify?.nome || c.slug || '';
+      $('#pb-ajuda-dominio').innerHTML = `No sítio onde compraste o domínio, cria um registo <b>A</b> a apontar para <code>${esc(config.ipServidor || 'o IP do servidor')}</code>.
+        Depois o domínio tem de ser adicionado ao serviço do clonador no Easypanel (é aí que se liga o HTTPS).`;
+      $('#pb-netlify-info').innerHTML = !config.netlify
+        ? '⚠️ Ainda não ligado: falta pôr o <code>NETLIFY_TOKEN</code> no Easypanel.'
+        : c.netlify?.url ? `Publicado em <a href="${esc(c.netlify.url)}" target="_blank">${esc(c.netlify.url)}</a> · carrega em Publicar de novo depois de mudares links ou pixels.`
+        : 'Cria um site grátis com HTTPS em segundos.';
+      $('#pb-netlify-publicar').disabled = !config.netlify;
+    }
+
+    $('#lista').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-publicar]');
+      if (!b) return;
+      paginaPub = ultimaLista.find((c) => c.id === b.dataset.publicar);
+      if (!paginaPub) return;
+      pbEstado('');
+      desenharPub();
+      dlgPub.showModal();
+    });
+
+    $('#pb-guardar').addEventListener('click', async () => {
+      try {
+        paginaPub = await api(`/api/clones/${paginaPub.id}/publicacao`, {
+          method: 'PUT',
+          body: JSON.stringify({ slug: $('#pb-slug').value, dominios: $('#pb-dominio').value.split(/[\s,]+/).filter(Boolean) }),
+        });
+        desenharPub();
+        pbEstado(paginaPub.slug ? `✓ No ar em ${location.origin}/${paginaPub.slug}/` : '✓ Guardado.', 'ok');
+        carregar();
+      } catch (err) { pbEstado(err.message, 'erro'); }
+    });
+
+    $('#pb-netlify-publicar').addEventListener('click', async () => {
+      const botao = $('#pb-netlify-publicar');
+      botao.disabled = true;
+      $('#pb-netlify-info').innerHTML = '<span class="giro"></span> A publicar na Netlify…';
+      try {
+        paginaPub = await api(`/api/clones/${paginaPub.id}/netlify`, { method: 'POST', body: JSON.stringify({ nome: $('#pb-netlify').value.trim().toLowerCase() }) });
+        desenharPub();
+        carregar();
+      } catch (err) {
+        $('#pb-netlify-info').innerHTML = `<span class="px-aviso">${esc(err.message)}</span>`;
+      } finally {
+        botao.disabled = !config.netlify;
+      }
+    });
+
+    for (const d of [dlgLinks, dlgPub]) {
+      d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-fechar]')) d.close(); });
+    }
 
     $('#sair').addEventListener('click', async () => {
       await fetch('/api/logout', { method: 'POST' });
