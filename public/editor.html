@@ -52,7 +52,7 @@
       <!-- Passos do quiz -->
       <section data-painel="passos" hidden>
         <h3>Passos do quiz</h3>
-        <p class="ed-dica">Escolhe um passo para o ver. Os textos, imagens e botões desse passo editam-se nos outros separadores. Reescreve as perguntas com as tuas palavras.</p>
+        <p class="ed-dica">Escolhe um passo na lista. Para mudar um texto, <b>clica nele na página e escreve</b>, ou usa os campos em “Textos deste passo”. Reescreve com as tuas palavras.</p>
         <div class="ed-grupo" id="qz-atual">
           <h4 id="qz-titulo"></h4>
           <label class="ed-campo">O que faz avançar
@@ -73,6 +73,11 @@
             <button id="qz-apagar" class="perigo">🗑 Apagar</button>
           </div>
         </div>
+        <details class="ed-grupo qz-textos" id="qz-textos-caixa" open>
+          <summary><h4>Textos deste passo</h4></summary>
+          <div id="qz-textos"></div>
+        </details>
+        <h4>Todos os passos</h4>
         <ol id="qz-lista" class="qz-lista"></ol>
       </section>
 

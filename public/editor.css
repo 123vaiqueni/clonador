@@ -117,3 +117,9 @@ details summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-
 .qz-lista .qz-txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .qz-lista .qz-txt b { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-weight: 600; }
 .qz-lista .qz-txt small { color: var(--muted); }
+.qz-textos summary { list-style: none; cursor: pointer; }
+.qz-textos summary h4 { display: inline; }
+#qz-textos { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.qz-texto { display: flex; flex-direction: column; gap: 2px; }
+.qz-texto small { font-size: 11px; color: var(--muted); }
+.qz-texto textarea { font: inherit; font-size: 14px; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; width: 100%; }

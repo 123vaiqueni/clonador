@@ -53,7 +53,7 @@ $('#ed-desfazer').addEventListener('click', () => {
 let aba = 'texto';
 function modoClique() {
   if (!doc) return;
-  doc.body.contentEditable = aba === 'texto' && !bloqueada() ? 'true' : 'false';
+  doc.body.contentEditable = (aba === 'texto' || aba === 'passos') && !bloqueada() ? 'true' : 'false';
   doc.documentElement.toggleAttribute('data-ed-escolher', ['imagens', 'botoes', 'elemento', 'provas'].includes(aba));
 }
 function redesenharAba() {
@@ -156,6 +156,7 @@ function desenharPassos() {
     $('#qz-auto-l').hidden = $('#qz-tipo').value !== 'auto';
     $('#qz-auto').value = ((+p.getAttribute('data-quiz-auto') || 3000) / 1000).toString();
   }
+  desenharTextosPasso(p);
   $('#qz-lista').innerHTML = lista.map((q, i) => {
     const foto = q.getAttribute('data-quiz-foto');
     const titulo = q.querySelector('h1,h2,h3')?.innerText?.trim() || q.getAttribute('data-quiz-titulo') || '';
@@ -167,6 +168,49 @@ function desenharPassos() {
   }).join('');
   $('#qz-lista').querySelector('li.ativo')?.scrollIntoView({ block: 'nearest' });
 }
+// Cada texto visível do passo num campo (títulos, respostas, botões) — mais fácil do
+// que clicar dentro de botões, sobretudo no telemóvel.
+let textosPasso = [];
+function desenharTextosPasso(p) {
+  textosPasso = [];
+  if (p) {
+    const it = doc.createTreeWalker(p, NodeFilter.SHOW_TEXT, {
+      acceptNode: (t) => (!t.data.trim() || t.parentElement?.closest('style,script,noscript') || !t.parentElement?.getClientRects().length
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
+    for (let t = it.nextNode(); t && textosPasso.length < 80; t = it.nextNode()) textosPasso.push(t);
+  }
+  $('#qz-textos').innerHTML = textosPasso.length
+    ? textosPasso.map((t, i) => {
+      const el = t.parentElement;
+      const tipo = el.closest('[data-quiz-opcao]') ? 'resposta' : el.closest('[data-quiz-ir],button,a') ? 'botão' : el.closest('h1,h2,h3') ? 'título' : '';
+      return `<label class="qz-texto">${tipo ? `<small>${tipo}</small>` : ''}<textarea data-i="${i}" rows="${t.data.trim().length > 60 ? 3 : 1}">${esc(t.data.trim())}</textarea></label>`;
+    }).join('')
+    : '<p class="ed-dica">Este passo não tem textos.</p>';
+}
+let textoMarcado = false;
+$('#qz-textos').addEventListener('input', (e) => {
+  const t = textosPasso[e.target.dataset.i];
+  if (!t) return;
+  if (!textoMarcado) { marcar(); textoMarcado = true; }
+  const [, antes, , depois] = t.data.match(/^(\s*)([\s\S]*?)(\s*)$/);
+  t.data = antes + e.target.value + depois;
+  mudou = true;
+});
+$('#qz-textos').addEventListener('focusin', (e) => {
+  const t = textosPasso[e.target.dataset?.i];
+  if (t) { textoMarcado = false; destacar(t.parentElement); }
+});
+// Ao escrever directamente na página, os campos acompanham.
+let redesenhoTextos;
+frame.addEventListener('load', () => doc?.addEventListener('input', () => {
+  if (aba !== 'passos') return;
+  clearTimeout(redesenhoTextos);
+  redesenhoTextos = setTimeout(() => {
+    if (!$('#qz-textos').contains(document.activeElement)) desenharTextosPasso(passosQuiz()[passoVisto]);
+  }, 600);
+}));
+
 $('#qz-lista').addEventListener('click', (e) => {
   const li = e.target.closest('[data-i]');
   if (li) verPasso(Number(li.dataset.i));
@@ -235,7 +279,7 @@ function aoClicar(e) {
     fn('#' + alvo.id, alvo);
     return;
   }
-  if (aba === 'texto') return;
+  if (aba === 'texto' || aba === 'passos') return;
   e.preventDefault();
   if (aba === 'imagens') {
     const img = imagemEm(e.target);
