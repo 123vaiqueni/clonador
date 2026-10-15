@@ -38,30 +38,36 @@
       <div class="estado" id="estado"></div>
     </form>
 
-    <h2 id="titulo-lista">Páginas clonadas</h2>
+    <div class="bb-topo">
+      <h2 id="titulo-lista">Biblioteca</h2>
+      <div class="bb-filtros">
+        <input id="bb-procurar" type="search" placeholder="Procurar (nome, nicho, etiqueta, notas)…" autocomplete="off">
+        <select id="bb-nicho"><option value="">Todos os nichos</option></select>
+        <label class="bb-fav"><input type="checkbox" id="bb-fav"> ⭐</label>
+      </div>
+    </div>
     <div class="grelha" id="lista"></div>
   </div>
 
-  <dialog id="dlg-links">
+  <dialog id="dlg-estudo">
     <div class="dlg-topo">
-      <strong>Links e checkouts</strong>
+      <strong>Estudo da página</strong>
       <button class="link" data-fechar aria-label="Fechar">✕</button>
     </div>
-    <div class="dlg-sub" id="ln-titulo"></div>
-    <div class="ln-todos">
-      <input id="ln-todos" placeholder="Colar o teu checkout para TODOS os botões de compra…" autocomplete="off">
-      <button id="ln-aplicar-todos" type="button">Aplicar a todos</button>
-    </div>
-    <div class="ln-wa">
-      <span>ou gerar link de WhatsApp:</span>
-      <input id="ln-wa-numero" placeholder="923 456 789" inputmode="tel">
-      <input id="ln-wa-msg" placeholder="Olá, quero o produto!" value="Olá, quero saber mais sobre o produto">
-      <button id="ln-wa-gerar" type="button">Gerar</button>
-    </div>
-    <div id="ln-lista"></div>
+    <div class="dlg-sub" id="es-origem"></div>
+    <h3>Nome</h3>
+    <input id="es-titulo" class="pb-campo" autocomplete="off">
+    <h3>Nicho</h3>
+    <input id="es-nicho" class="pb-campo" list="nichos" placeholder="ex.: emagrecimento, receitas, renda extra" autocomplete="off">
+    <datalist id="nichos"></datalist>
+    <h3>Etiquetas</h3>
+    <input id="es-etiquetas" class="pb-campo" placeholder="ex.: quiz, vsl, low ticket, escala (separadas por vírgulas)" autocomplete="off">
+    <h3>Notas de estudo</h3>
+    <textarea id="es-notas" class="pb-campo" rows="9" placeholder="Promessa principal:&#10;Mecanismo:&#10;Oferta e preço (âncora):&#10;Bónus:&#10;Garantia:&#10;Provas sociais:&#10;Estágio de sofisticação (E1–E5):&#10;O que vou modelar:"></textarea>
+    <label class="es-fav"><input type="checkbox" id="es-fav"> ⭐ Favorita (referência forte)</label>
     <div class="dlg-rodape">
-      <div class="estado" id="ln-estado"></div>
-      <button class="principal" id="ln-guardar" type="button">Guardar links</button>
+      <div class="estado" id="es-estado"></div>
+      <button class="principal" id="es-guardar" type="button">Guardar</button>
     </div>
   </dialog>
 
@@ -96,39 +102,6 @@
     <div class="pb-ajuda" id="pb-netlify-info"></div>
   </dialog>
 
-  <dialog id="dlg-pixels">
-    <div class="dlg-topo">
-      <strong>Pixels</strong>
-      <button class="link" data-fechar aria-label="Fechar">✕</button>
-    </div>
-    <div class="dlg-sub" id="px-titulo"></div>
-
-    <h3>Na página original</h3>
-    <div id="px-originais"></div>
-
-    <h3>Os teus pixels</h3>
-    <div id="px-meus"></div>
-
-    <form id="px-form" class="px-form">
-      <select id="px-plataforma">
-        <option value="meta">Meta (Facebook/Instagram)</option>
-        <option value="tiktok">TikTok</option>
-        <option value="google">Google Ads / Analytics</option>
-        <option value="gtm">Google Tag Manager</option>
-        <option value="kwai">Kwai</option>
-        <option value="pinterest">Pinterest</option>
-        <option value="snapchat">Snapchat</option>
-        <option value="utmify">Utmify</option>
-        <option value="clarity">Microsoft Clarity</option>
-        <option value="personalizado">Código personalizado…</option>
-      </select>
-      <input id="px-id" placeholder="ID do pixel" autocomplete="off">
-      <textarea id="px-codigo" rows="5" placeholder="Cola aqui o código completo (&lt;script&gt;…&lt;/script&gt;)" hidden></textarea>
-      <button class="principal" type="submit">Adicionar</button>
-    </form>
-    <div class="estado" id="px-estado"></div>
-  </dialog>
-
   <script>
     const $ = (s) => document.querySelector(s);
     const estado = $('#estado');
@@ -161,25 +134,35 @@
 
     let ultimaLista = [];
     async function carregar() {
-      const lista = await api('/api/clones');
-      ultimaLista = lista;
-      $('#titulo-lista').textContent = `Páginas clonadas (${lista.length})`;
-      if (!lista.length) {
+      ultimaLista = await api('/api/clones');
+      desenharNichos(ultimaLista);
+      desenhar(ultimaLista);
+    }
+    function desenhar(todas) {
+      const lista = filtrar(todas);
+      $('#titulo-lista').textContent = `Biblioteca (${lista.length === todas.length ? todas.length : `${lista.length} de ${todas.length}`})`;
+      if (!todas.length) {
         $('#lista').innerHTML = '<div class="vazio" style="grid-column:1/-1">Ainda não clonaste nenhuma página. Cola um link em cima.</div>';
+        return;
+      }
+      if (!lista.length) {
+        $('#lista').innerHTML = '<div class="vazio" style="grid-column:1/-1">Nada com esse filtro.</div>';
         return;
       }
       $('#lista').innerHTML = lista.map((c) => `
         <div class="clone">
           <a class="thumb" href="/p/${c.id}/" target="_blank" style="background-image:url('/p/${c.id}/thumb.jpg')"></a>
           <div class="corpo">
-            <div class="titulo">${esc(c.titulo)}</div>
-            <div class="origem" title="${esc(c.url)}">${esc(new URL(c.url).hostname)} · ${c.formato === 'computador' ? '💻' : '📱'} · ${c.modo === 'estatica' ? '📷' : '✨'} · ${tamanho(c.bytes)}</div>
+            <div class="titulo"><button class="link fav ${c.favorito ? 'on' : ''}" data-fav="${c.id}" title="Favorita">${c.favorito ? '★' : '☆'}</button>${esc(c.titulo)}</div>
+            <div class="origem" title="${esc(c.url)}">${esc(new URL(c.url).hostname)} · ${c.formato === 'computador' ? '💻' : '📱'} · ${c.modo === 'estatica' ? '📷' : c.spa ? '⚛️' : '✨'} · ${tamanho(c.bytes)}${c.editadoEm ? ' · ✏️ editada' : ''}</div>
+            ${c.nicho || c.etiquetas?.length ? `<div class="etiquetas">${c.nicho ? `<span class="nicho">${esc(c.nicho)}</span>` : ''}${(c.etiquetas || []).map((t) => `<span>${esc(t)}</span>`).join('')}</div>` : ''}
+            ${c.notas ? `<div class="notas" title="${esc(c.notas)}">📝 ${esc(c.notas.split(/\n/).find((l) => l.trim()) || '').slice(0, 90)}</div>` : ''}
             ${publicadoEm(c)}
             <div class="accoes">
+              <a class="btn principal" href="/editor.html?id=${c.id}">✏️ Editar</a>
               <a class="btn" href="${urlPublica(c)}" target="_blank">Abrir</a>
-              <button data-links="${c.id}">Links${(c.substituicoes || []).length ? ` (${c.substituicoes.length})` : ''}</button>
-              <button data-pixels="${c.id}">Pixels${(c.meusPixels || []).length ? ` (${c.meusPixels.length})` : ''}</button>
-              <button class="principal" data-publicar="${c.id}">Publicar</button>
+              <button data-publicar="${c.id}">Publicar</button>
+              <button data-estudo="${c.id}">📝 Estudo</button>
               <button data-copiar="${c.id}">Copiar link</button>
               <a class="btn" href="/api/clones/${c.id}/zip">ZIP</a>
               <button class="perigo" data-apagar="${c.id}">Apagar</button>
@@ -233,165 +216,58 @@
       }
     });
 
-    // ── Pixels
-    const NOMES = {
-      meta: 'Meta', tiktok: 'TikTok', google: 'Google', gtm: 'Tag Manager', kwai: 'Kwai',
-      pinterest: 'Pinterest', snapchat: 'Snapchat', utmify: 'Utmify', clarity: 'Clarity', personalizado: 'Personalizado',
-    };
-    const dlg = $('#dlg-pixels');
-    let atual = null;
-
-    function pxEstado(msg, tipo = '') {
-      $('#px-estado').className = 'estado ' + tipo;
-      $('#px-estado').textContent = msg;
+    // ── Biblioteca: procurar, filtrar por nicho, favoritos
+    function filtrar(lista) {
+      const q = $('#bb-procurar').value.trim().toLowerCase();
+      const nicho = $('#bb-nicho').value;
+      const fav = $('#bb-fav').checked;
+      return lista.filter((c) => (!nicho || c.nicho === nicho) && (!fav || c.favorito)
+        && (!q || [c.titulo, c.url, c.nicho, c.notas, ...(c.etiquetas || [])].join(' ').toLowerCase().includes(q)));
     }
-
-    function desenharPixels() {
-      $('#px-titulo').textContent = atual.titulo;
-      const orig = atual.pixelsOriginais || [];
-      $('#px-originais').innerHTML = orig.length ? orig.map((p) => `
-        <div class="px-linha">
-          <span class="px-tag">${NOMES[p.plataforma] || p.plataforma}</span>
-          <code>${esc(p.id)}</code>
-          ${p.estado === 'removido' ? '<span class="px-ok">removido ✓</span>'
-            : p.estado === 'via-gtm' ? '<span class="px-aviso" title="Não está escrito na página — é carregado pelo Tag Manager. Remove o GTM.">vem pelo GTM</span>'
-            : `<button class="perigo" data-remover-orig="${esc(p.id)}">Remover</button>`}
-        </div>`).join('')
-        : '<div class="px-vazio">Nenhum pixel encontrado.</div>';
-
-      const meus = atual.meusPixels || [];
-      $('#px-meus').innerHTML = meus.length ? meus.map((p, i) => `
-        <div class="px-linha">
-          <span class="px-tag meu">${NOMES[p.plataforma]}</span>
-          <code>${esc(p.plataforma === 'personalizado' ? (p.codigo.slice(0, 40) + (p.codigo.length > 40 ? '…' : '')) : p.id)}</code>
-          <button class="perigo" data-tirar-meu="${i}">Tirar</button>
-        </div>`).join('')
-        : '<div class="px-vazio">Ainda não adicionaste nenhum. Entram na página publicada e no ZIP.</div>';
+    function desenharNichos(lista) {
+      const nichos = [...new Set(lista.map((c) => c.nicho).filter(Boolean))].sort();
+      const atual = $('#bb-nicho').value;
+      $('#bb-nicho').innerHTML = '<option value="">Todos os nichos</option>' + nichos.map((n) => `<option ${n === atual ? 'selected' : ''}>${esc(n)}</option>`).join('');
+      $('#nichos').innerHTML = nichos.map((n) => `<option value="${esc(n)}">`).join('');
     }
+    for (const el of ['#bb-procurar', '#bb-nicho', '#bb-fav']) $(el).addEventListener('input', () => desenhar(ultimaLista));
 
-    async function guardarMeus(lista) {
-      atual = await api(`/api/clones/${atual.id}/pixels`, { method: 'PUT', body: JSON.stringify({ meusPixels: lista }) });
-      desenharPixels();
-      carregar();
-    }
-
-    $('#px-plataforma').addEventListener('change', () => {
-      const perso = $('#px-plataforma').value === 'personalizado';
-      $('#px-id').hidden = perso;
-      $('#px-codigo').hidden = !perso;
-    });
-
-    $('#px-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const plataforma = $('#px-plataforma').value;
-      const novo = plataforma === 'personalizado'
-        ? { plataforma, codigo: $('#px-codigo').value }
-        : { plataforma, id: $('#px-id').value.trim() };
-      try {
-        await guardarMeus([...(atual.meusPixels || []), novo]);
-        $('#px-id').value = ''; $('#px-codigo').value = '';
-        pxEstado('✓ Pixel adicionado — já está na página publicada.', 'ok');
-      } catch (err) { pxEstado(err.message, 'erro'); }
-    });
-
-    dlg.addEventListener('click', async (e) => {
-      if (e.target === dlg || e.target.closest('[data-fechar]')) return dlg.close();
-      const tirar = e.target.closest('[data-tirar-meu]');
-      const remover = e.target.closest('[data-remover-orig]');
-      try {
-        if (tirar) {
-          const lista = [...atual.meusPixels];
-          lista.splice(Number(tirar.dataset.tirarMeu), 1);
-          await guardarMeus(lista);
-          pxEstado('Pixel tirado.', 'ok');
-        }
-        if (remover) {
-          const r = await api(`/api/clones/${atual.id}/pixels/remover`, { method: 'POST', body: JSON.stringify({ id: remover.dataset.removerOrig }) });
-          atual = r.meta;
-          desenharPixels();
-          pxEstado(r.removidos ? `✓ Removido (${r.removidos} bloco${r.removidos > 1 ? 's' : ''} de código).` : 'Não está escrito na página — vem pelo Tag Manager. Remove o GTM.', r.removidos ? 'ok' : 'erro');
-        }
-      } catch (err) { pxEstado(err.message, 'erro'); }
-    });
-
-    $('#lista').addEventListener('click', async (e) => {
-      const b = e.target.closest('[data-pixels]');
+    // ── Estudo: notas da estrutura de cada página
+    const dlgEstudo = $('#dlg-estudo');
+    let paginaEstudo = null;
+    $('#lista').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-estudo]');
       if (!b) return;
-      const lista = await api('/api/clones');
-      atual = lista.find((c) => c.id === b.dataset.pixels);
-      if (!atual) return;
-      pxEstado('');
-      desenharPixels();
-      dlg.showModal();
+      paginaEstudo = ultimaLista.find((c) => c.id === b.dataset.estudo);
+      if (!paginaEstudo) return;
+      $('#es-titulo').value = paginaEstudo.titulo || '';
+      $('#es-nicho').value = paginaEstudo.nicho || '';
+      $('#es-etiquetas').value = (paginaEstudo.etiquetas || []).join(', ');
+      $('#es-notas').value = paginaEstudo.notas || '';
+      $('#es-fav').checked = Boolean(paginaEstudo.favorito);
+      $('#es-origem').innerHTML = `<a href="${esc(paginaEstudo.url)}" target="_blank" rel="noreferrer">${esc(paginaEstudo.url)}</a>`;
+      $('#es-estado').textContent = '';
+      dlgEstudo.showModal();
     });
-
-    // ── Links
-    const dlgLinks = $('#dlg-links');
-    let links = [];
-    let paginaLinks = null;
-    const TIPO = { checkout: '💳', whatsapp: '💬', link: '🔗' };
-
-    function lnEstado(msg, tipo = '') { $('#ln-estado').className = 'estado ' + tipo; $('#ln-estado').textContent = msg; }
-
-    function desenharLinks() {
-      if (!links.length) {
-        $('#ln-lista').innerHTML = '<div class="px-vazio">Não encontrei botões de compra nem checkouts nesta página.</div>';
-        return;
-      }
-      $('#ln-lista').innerHTML = links.map((l, i) => `
-        <div class="ln-item ${l.tipo}">
-          <div class="ln-cab">
-            <span class="px-tag">${TIPO[l.tipo]} ${esc(l.plataforma)}</span>
-            <span class="ln-textos">${l.textos.map((t) => `“${esc(t)}”`).join(' ')}${l.ocorrencias > 1 ? ` · ${l.ocorrencias}×` : ''}</span>
-          </div>
-          <a class="ln-url" href="${esc(l.url)}" target="_blank" rel="noreferrer" title="${esc(l.url)}">${esc(l.url)}</a>
-          <input data-i="${i}" class="ln-novo" placeholder="Novo link (vazio = fica o original)" value="${esc(l.novo || '')}" autocomplete="off">
-        </div>`).join('');
-    }
-
-    $('#lista').addEventListener('click', async (e) => {
-      const b = e.target.closest('[data-links]');
-      if (!b) return;
-      paginaLinks = ultimaLista.find((c) => c.id === b.dataset.links);
-      $('#ln-titulo').textContent = paginaLinks?.titulo || '';
-      lnEstado('A procurar links…');
-      $('#ln-lista').innerHTML = '';
-      dlgLinks.showModal();
+    $('#es-guardar').addEventListener('click', async () => {
       try {
-        links = await api(`/api/clones/${b.dataset.links}/links`);
-        lnEstado(`${links.filter((l) => l.tipo === 'checkout').length} checkouts · ${links.filter((l) => l.tipo === 'whatsapp').length} WhatsApp · ${links.filter((l) => l.tipo === 'link').length} outros botões`);
-        desenharLinks();
-      } catch (err) { lnEstado(err.message, 'erro'); }
-    });
-
-    $('#ln-lista').addEventListener('input', (e) => {
-      if (e.target.matches('.ln-novo')) links[e.target.dataset.i].novo = e.target.value.trim();
-    });
-
-    $('#ln-aplicar-todos').addEventListener('click', () => {
-      const v = $('#ln-todos').value.trim();
-      if (!v) return lnEstado('Cola primeiro o teu link.', 'erro');
-      let n = 0;
-      links.forEach((l) => { if (l.tipo !== 'link' || l.botao) { l.novo = v; n++; } });
-      desenharLinks();
-      lnEstado(`Aplicado a ${n} links — carrega em “Guardar links”.`, 'ok');
-    });
-
-    $('#ln-wa-gerar').addEventListener('click', async () => {
-      try {
-        const r = await api(`/api/whatsapp?numero=${encodeURIComponent($('#ln-wa-numero').value)}&mensagem=${encodeURIComponent($('#ln-wa-msg').value)}`);
-        $('#ln-todos').value = r.link;
-        lnEstado('Link de WhatsApp pronto — carrega em “Aplicar a todos” ou cola num link.', 'ok');
-      } catch (err) { lnEstado(err.message, 'erro'); }
-    });
-
-    $('#ln-guardar').addEventListener('click', async () => {
-      try {
-        const substituicoes = links.filter((l) => l.novo).map((l) => ({ de: l.url, para: l.novo }));
-        await api(`/api/clones/${paginaLinks.id}/links`, { method: 'PUT', body: JSON.stringify({ substituicoes }) });
-        lnEstado(`✓ ${substituicoes.length} link${substituicoes.length === 1 ? '' : 's'} trocado${substituicoes.length === 1 ? '' : 's'} — já está na página publicada.`, 'ok');
+        await api(`/api/clones/${paginaEstudo.id}/biblioteca`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            titulo: $('#es-titulo').value, nicho: $('#es-nicho').value, etiquetas: $('#es-etiquetas').value,
+            notas: $('#es-notas').value, favorito: $('#es-fav').checked,
+          }),
+        });
+        dlgEstudo.close();
         carregar();
-      } catch (err) { lnEstado(err.message, 'erro'); }
+      } catch (err) { $('#es-estado').className = 'estado erro'; $('#es-estado').textContent = err.message; }
+    });
+    $('#lista').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-fav]');
+      if (!b) return;
+      const c = ultimaLista.find((x) => x.id === b.dataset.fav);
+      await api(`/api/clones/${c.id}/biblioteca`, { method: 'PUT', body: JSON.stringify({ favorito: !c.favorito }) });
+      carregar();
     });
 
     // ── Publicar
@@ -452,7 +328,7 @@
       }
     });
 
-    for (const d of [dlgLinks, dlgPub]) {
+    for (const d of [dlgEstudo, dlgPub]) {
       d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-fechar]')) d.close(); });
     }
 

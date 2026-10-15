@@ -32,9 +32,9 @@ const CHECKOUTS = [
   [/(^|\.)mercadopago\.com(\.br)?$/, 'Mercado Pago'],
   [/(^|\.)pagseguro\.uol\.com\.br$/, 'PagSeguro'],
 ];
-const PALAVRAS_COMPRA = /comprar|compre|quero|garant|adquir|encomend|pedir|peça|pedido|finalizar|checkout|buy|order|add to cart|get (it|yours|access|started)|claim|yes[,!]? i|sim[,!]? quero|acesso|inscrev|matricul|assin/i;
+export const PALAVRAS_COMPRA = /comprar|compre|quero|garant|adquir|encomend|pedir|peça|pedido|finalizar|checkout|buy|order|add to cart|get (it|yours|access|started)|claim|yes[,!]? i|sim[,!]? quero|acesso|inscrev|matricul|assin/i;
 
-function classificar(url) {
+export function classificar(url) {
   let u;
   try { u = new URL(url); } catch { return null; }
   const host = u.hostname.toLowerCase();

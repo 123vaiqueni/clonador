@@ -130,3 +130,21 @@ dialog#dlg-links { width: min(720px, calc(100vw - 32px)); }
   .grelha { grid-template-columns: 1fr 1fr; gap: 10px; }
   .clone .accoes { gap: 4px; }
 }
+
+/* Biblioteca */
+.bb-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 26px 0 12px; }
+.bb-topo h2 { margin: 0; }
+.bb-filtros { display: flex; gap: 8px; flex-wrap: wrap; flex: 1 1 320px; justify-content: flex-end; }
+.bb-filtros input, .bb-filtros select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.bb-filtros input { flex: 1 1 200px; min-width: 0; }
+.bb-fav { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.etiquetas { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.etiquetas span { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+.etiquetas span.nicho { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.notas { font-size: 12px; color: var(--muted); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fav { font-size: 17px; padding: 0 6px 0 0; color: var(--muted); vertical-align: -1px; }
+.fav.on { color: #f59f00; }
+#dlg-estudo { width: min(620px, calc(100vw - 32px)); }
+#dlg-estudo .pb-campo { width: 100%; }
+#dlg-estudo textarea { font: inherit; resize: vertical; }
+.es-fav { display: flex; align-items: center; gap: 8px; margin-top: 12px; cursor: pointer; }

@@ -11,22 +11,28 @@
 </head>
 <body class="ed">
   <header class="ed-topo">
-    <a class="btn" href="/" title="Voltar à lista">←</a>
+    <a class="btn" href="/" title="Voltar à biblioteca">←</a>
     <div class="ed-nome" id="ed-nome">A carregar…</div>
     <div class="ed-vista seg" title="Pré-visualizar como">
       <label><input type="radio" name="vista" value="telemovel" checked><span>📱</span></label>
       <label><input type="radio" name="vista" value="computador"><span>💻</span></label>
     </div>
+    <button id="ed-desfazer" title="Desfazer a última alteração" disabled>↶</button>
     <button id="ed-repor" class="link" title="Desfazer todas as edições">Repor original</button>
     <a class="btn" id="ed-abrir" target="_blank">Ver</a>
     <button class="principal" id="ed-guardar">Guardar</button>
   </header>
 
   <nav class="ed-abas" id="ed-abas">
-    <button data-aba="texto" class="ativa">✏️ Texto</button>
-    <button data-aba="elemento">👆 Elemento</button>
+    <button data-aba="texto" class="ativa">✏️ Textos</button>
+    <button data-aba="imagens">🖼️ Imagens</button>
+    <button data-aba="botoes">🔘 Botões</button>
+    <button data-aba="elemento">👆 Blocos</button>
+    <button data-aba="provas">⭐ Provas sociais</button>
+    <button data-aba="pixels">📡 Pixels</button>
     <button data-aba="cores">🎨 Cores</button>
     <button data-aba="mobile">📱 Mobile</button>
+    <button data-aba="velocidade">⚡ Velocidade</button>
   </nav>
 
   <main class="ed-corpo">
@@ -35,10 +41,17 @@
     </div>
 
     <aside class="ed-painel" id="ed-painel">
-      <!-- Texto -->
+      <div class="ed-aviso" id="ed-app" hidden>
+        <strong>Esta página é uma app (Lovable/React).</strong>
+        O conteúdo é montado por código, por isso ainda não dá para editar aqui.
+        Posso guardá-la como página normal: fica igual à vista, mas efeitos feitos por código (quiz, contadores) podem parar.
+        <button class="principal" id="ed-fotografar">Tornar editável</button>
+      </div>
+
+      <!-- Textos -->
       <section data-painel="texto">
-        <h3>Editar texto</h3>
-        <p class="ed-dica">Clica em qualquer texto da página e escreve por cima — títulos, parágrafos, botões, preços.</p>
+        <h3>Textos</h3>
+        <p class="ed-dica">Clica em qualquer texto da página e escreve por cima: títulos, parágrafos, botões, preços. Reescreve com as tuas palavras, não copies.</p>
         <div class="ed-botoes-fmt">
           <button data-cmd="bold" title="Negrito"><b>N</b></button>
           <button data-cmd="italic" title="Itálico"><i>I</i></button>
@@ -46,12 +59,71 @@
           <button data-cmd="strikeThrough" title="Riscado (preço antigo)"><s>R</s></button>
           <label class="ed-cor-txt" title="Cor do texto seleccionado">A <input type="color" id="fmt-cor" value="#e03131"></label>
         </div>
-        <p class="ed-dica">Dica: selecciona uma palavra para a pôr a negrito, riscar ou mudar de cor.</p>
+
+        <div class="ed-grupo">
+          <h4>Trocar em toda a página</h4>
+          <input id="tr-de" placeholder="Palavra ou frase (ex.: nome do produto deles)">
+          <input id="tr-para" placeholder="Trocar por…">
+          <button id="tr-aplicar">Trocar tudo</button>
+          <p class="ed-dica" id="tr-info"></p>
+        </div>
+
+        <div class="ed-grupo">
+          <h4>Título da aba do browser</h4>
+          <input id="tx-titulo" placeholder="Título da página">
+        </div>
+
+        <div class="ed-grupo">
+          <h4>Estrutura da página</h4>
+          <p class="ed-dica">Os títulos pela ordem em que aparecem. Clica para ir até lá.</p>
+          <ol id="tx-estrutura" class="ed-estrutura"></ol>
+        </div>
       </section>
 
-      <!-- Elemento -->
+      <!-- Imagens -->
+      <section data-painel="imagens" hidden>
+        <h3>Imagens</h3>
+        <p class="ed-dica">Da primeira (topo) à última. Clica numa imagem aqui ou na página para a trocar.</p>
+        <div id="im-editor" class="ed-grupo" hidden>
+          <h4 id="im-titulo">Imagem</h4>
+          <img id="im-previa" alt="">
+          <div class="ed-info" id="im-info"></div>
+          <label class="btn ed-upload">📤 Trocar por uma minha<input type="file" id="im-ficheiro" accept="image/*" hidden></label>
+          <input id="im-url" placeholder="…ou cola o link de uma imagem">
+          <div class="ed-linha">
+            <button id="im-esconder">🙈 Esconder</button>
+            <button id="im-fechar" class="link">Fechar</button>
+          </div>
+        </div>
+        <div id="im-lista" class="ed-imgs"></div>
+      </section>
+
+      <!-- Botões -->
+      <section data-painel="botoes" hidden>
+        <h3>Botões e links</h3>
+        <div class="ed-grupo">
+          <h4>O teu link em todos os botões de compra</h4>
+          <input id="bt-todos" placeholder="https://… (o teu checkout)">
+          <div class="ed-wa">
+            <input id="bt-wa-num" placeholder="WhatsApp: 923 456 789" inputmode="tel">
+            <input id="bt-wa-msg" value="Olá, quero saber mais sobre o produto">
+            <button id="bt-wa-gerar" type="button">Gerar link WhatsApp</button>
+          </div>
+          <button class="principal" id="bt-aplicar-todos">Aplicar a todos os botões de compra</button>
+        </div>
+        <p class="ed-dica">Em cada botão: muda o link, faz deslizar até uma secção (ex.: os planos) ou tira o link.</p>
+        <p class="ed-dica" id="bt-ancora-info"></p>
+        <div id="bt-lista"></div>
+        <div class="ed-grupo" id="bt-codigo" hidden>
+          <h4>Checkouts escondidos no código</h4>
+          <p class="ed-dica">Links de compra que a página abre por script, sem botão visível. Põe aqui o teu.</p>
+          <div id="bt-codigo-lista"></div>
+        </div>
+      </section>
+
+      <!-- Blocos -->
       <section data-painel="elemento" hidden>
-        <h3>Elemento</h3>
+        <h3>Blocos</h3>
         <p class="ed-dica" id="el-vazio">Clica numa imagem, botão ou bloco da página.</p>
         <div id="el-opcoes" hidden>
           <div class="ed-tag" id="el-tipo"></div>
@@ -82,10 +154,60 @@
           </div>
 
           <div class="ed-grupo ed-accoes">
+            <button id="el-cima" title="Mover para cima">↑ Subir</button>
+            <button id="el-baixo" title="Mover para baixo">↓ Descer</button>
             <button id="el-esconder">🙈 Esconder</button>
             <button id="el-duplicar">⧉ Duplicar</button>
             <button id="el-apagar" class="perigo">🗑 Apagar</button>
           </div>
+        </div>
+      </section>
+
+      <!-- Provas sociais -->
+      <section data-painel="provas" hidden>
+        <h3>Carrossel de provas sociais</h3>
+        <p class="ed-dica">Envia os prints dos teus clientes (conversas de WhatsApp, fotos, avaliações). Fica um carrossel que se passa com o dedo.</p>
+        <div class="ed-aviso" id="pv-existente" hidden>
+          Seleccionaste um carrossel que já está na página.
+          <button id="pv-carregar">Editar este carrossel</button>
+        </div>
+        <label class="btn ed-upload">📤 Adicionar prints<input type="file" id="pv-ficheiros" accept="image/*" multiple hidden></label>
+        <div id="pv-fotos" class="ed-imgs pequenas"></div>
+        <input id="pv-titulo" placeholder="Título (ex.: Quem já comprou)" value="O que dizem os nossos clientes">
+        <label class="ed-interruptor"><input type="checkbox" id="pv-auto" checked> Passar sozinho</label>
+        <button class="principal" id="pv-inserir" disabled>Inserir na página</button>
+        <p class="ed-dica" id="pv-info"></p>
+      </section>
+
+      <!-- Pixels -->
+      <section data-painel="pixels" hidden>
+        <h3>Pixels</h3>
+        <h4>Da página original</h4>
+        <div id="px-originais"></div>
+        <h4>Os teus</h4>
+        <div id="px-meus"></div>
+        <form id="px-form" class="px-form">
+          <select id="px-plataforma">
+            <option value="meta">Meta (Facebook/Instagram)</option>
+            <option value="tiktok">TikTok</option>
+            <option value="google">Google Ads / Analytics</option>
+            <option value="gtm">Google Tag Manager</option>
+            <option value="kwai">Kwai</option>
+            <option value="pinterest">Pinterest</option>
+            <option value="snapchat">Snapchat</option>
+            <option value="utmify">Utmify</option>
+            <option value="clarity">Microsoft Clarity</option>
+            <option value="personalizado">Código personalizado…</option>
+          </select>
+          <input id="px-id" placeholder="ID do pixel" autocomplete="off">
+          <textarea id="px-codigo" rows="5" placeholder="Cola aqui o código completo (&lt;script&gt;…&lt;/script&gt;)" hidden></textarea>
+          <button class="principal" type="submit">Adicionar</button>
+        </form>
+        <div class="ed-grupo">
+          <h4>Teste</h4>
+          <p class="ed-dica">Abro a página publicada como um visitante e vejo que pixels disparam de verdade. Os eventos do teste não chegam ao Meta.</p>
+          <button id="px-verificar">🔍 Verificar pixels</button>
+          <div id="px-resultado"></div>
         </div>
       </section>
 
@@ -102,14 +224,30 @@
         <h3>Otimizar para telemóvel</h3>
         <p class="ed-dica">Corrige o que costuma partir no telemóvel: página a fugir para o lado, imagens e vídeos maiores que o ecrã, títulos gigantes, botões pequenos.</p>
         <label class="ed-interruptor"><input type="checkbox" id="mob-ativo"> Otimização automática ligada</label>
-        <p class="ed-dica">Usa o 📱 lá em cima para ver como fica. Se um bloco continuar mal, esconde-o no separador Elemento.</p>
+        <p class="ed-dica">Usa o 📱 lá em cima para ver como fica. Se um bloco continuar mal, esconde-o em Blocos.</p>
+      </section>
+
+      <!-- Velocidade -->
+      <section data-painel="velocidade" hidden>
+        <h3>Velocidade</h3>
+        <p class="ed-dica">Medido num telemóvel médio em 4G lento. Metas: imagem principal em ≤ 2,5 s, nada a saltar (CLS ≤ 0,1) e página com ≤ 1 MB.</p>
+        <div class="ed-linha">
+          <button class="principal" id="vl-copia">Medir a minha</button>
+          <button id="vl-original">Medir a original</button>
+        </div>
+        <div id="vl-resultado"></div>
+        <div class="ed-grupo">
+          <h4>Imagens pesadas</h4>
+          <p class="ed-dica">Converte as imagens grandes da página para WebP, em tamanho de telemóvel. Normalmente fica 3 a 10× mais leve, sem diferença à vista.</p>
+          <button id="vl-comprimir">⚡ Comprimir imagens</button>
+          <p class="ed-dica" id="vl-comprimir-info"></p>
+        </div>
       </section>
 
       <div class="estado" id="ed-estado"></div>
     </aside>
   </main>
 
-  <input type="file" id="ficheiro-geral" hidden>
   <script src="/editor.js"></script>
 </body>
 </html>

@@ -7,8 +7,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clonar } from './clone.js';
 import { injectarPixels, removerPixel, validarMeusPixels } from './pixels.js';
-import { aplicarSubstituicoes, extrairLinks, linkWhatsApp, validarSubstituicoes } from './links.js';
+import { aplicarSubstituicoes, classificar, extrairLinks, linkWhatsApp, validarSubstituicoes } from './links.js';
 import { netlifyLigado, publicarNetlify, zipEmMemoria } from './publicar.js';
+import { fotografar, medirVelocidade, verificarPixels } from './medir.js';
 import { trocarCoresCss, trocarCoresHtml, validarMapa } from './cores.js';
 
 const raiz = path.dirname(fileURLToPath(import.meta.url));
@@ -72,7 +73,7 @@ async function htmlFinal(id, prefixo = '/') {
   const [html, meta] = await Promise.all([readFile(path.join(pastaDe(id), 'index.html'), 'utf8'), lerMeta(id)]);
   const comLinks = aplicarSubstituicoes(html, meta?.substituicoes || []);
   const final = injectarPixels(injectarAjustes(comLinks, meta), meta?.meusPixels || []);
-  return meta?.spa ? prepararApp(final, meta.spa, prefixo, true) : final;
+  return meta?.spa ? prepararApp(final, meta.fotografada ? { ...meta.spa, router: false } : meta.spa, prefixo, true) : final;
 }
 
 // ── Páginas "app" (Lovable, React, Vite): os ficheiros do site estão nos caminhos
@@ -144,7 +145,10 @@ async function servirPagina(id, subcaminho, req, res, next, prefixo = '/') {
       res.setHeader('Cache-Control', 'no-cache');
       // O editor abre a cópia "crua" (sem pixels nem links trocados), para guardar só o que se editou.
       if (req.query.cru === '1' && autenticado(req)) {
-        return res.type('html').send(await readFile(path.join(pastaDe(id), 'index.html'), 'utf8'));
+        const cru = await readFile(path.join(pastaDe(id), 'index.html'), 'utf8');
+        const m = await lerMeta(id);
+        // Caminhos ajustados para as imagens aparecerem no editor (desfeito ao guardar).
+        return res.type('html').send(m?.spa ? prepararApp(cru, { ...m.spa, router: false }, `/p/${id}/`, true) : cru);
       }
       return res.type('html').send(await htmlFinal(id, prefixo));
     } catch {
@@ -413,8 +417,13 @@ async function guardarOriginal(id) {
 }
 
 app.put('/api/clones/:id/html', rota(async (req, id) => {
-  const html = String(req.body?.html || '');
+  let html = String(req.body?.html || '');
   if (html.length < 50 || !/<html[\s>]/i.test(html)) throw erro('O conteúdo da página veio vazio — não guardei nada.');
+  const m = await lerMeta(id);
+  if (m?.spa?.segmentos?.length) {
+    // O editor viu os caminhos com /p/<id>/ à frente; guardam-se os originais.
+    html = html.split(`/p/${id}/`).join('/');
+  }
   await guardarOriginal(id);
   await writeFile(path.join(pastaDe(id), 'index.html'), html, 'utf8');
   return comMeta(id, (m) => { m.editadoEm = new Date().toISOString(); });
@@ -457,8 +466,76 @@ app.post('/api/clones/:id/repor', rota(async (req, id) => {
   if (existsSync(pastaOrig)) {
     for (const f of await readdir(pastaOrig)) await copyFile(path.join(pastaOrig, f), path.join(pasta, 'assets', f));
   }
-  return comMeta(id, (m) => { delete m.editadoEm; m.mobile = false; });
+  return comMeta(id, (m) => { delete m.editadoEm; delete m.fotografada; m.mobile = false; });
 }));
+
+// ── Testes na página publicada (pixels, velocidade) e páginas app → editáveis
+const urlLocal = (id) => `http://127.0.0.1:${PORTA}/p/${id}/`;
+
+app.post('/api/clones/:id/pixels/verificar', rota(async (req, id) => {
+  const meta = await lerMeta(id);
+  if (!meta) throw erro('Página não encontrada.', 404);
+  const r = await verificarPixels(urlLocal(id), meta.formato);
+  const meus = new Set((meta.meusPixels || []).map((p) => `${p.plataforma}:${p.id}`));
+  r.pixels = r.pixels.map((p) => ({ ...p, meu: meus.has(`${p.plataforma}:${p.id}`) }));
+  // Pixels de outra pessoa que ainda disparam passam a aparecer na lista, com "Remover".
+  const estranhos = r.pixels.filter((p) => !p.meu);
+  const atualizada = await comMeta(id, (m) => {
+    m.pixelsOriginais ||= [];
+    for (const p of estranhos) {
+      const ja = m.pixelsOriginais.find((o) => o.id === p.id);
+      if (ja) ja.estado = 'ativo';
+      else m.pixelsOriginais.push({ plataforma: p.plataforma, id: p.id, estado: 'ativo' });
+    }
+    m.verificacaoPixels = { em: new Date().toISOString(), estranhos: estranhos.length };
+  });
+  return { ...r, meta: atualizada };
+}));
+
+app.post('/api/clones/:id/velocidade', rota(async (req, id) => {
+  const meta = await lerMeta(id);
+  if (!meta) throw erro('Página não encontrada.', 404);
+  const original = req.body?.alvo === 'original';
+  const r = await medirVelocidade(original ? meta.urlFinal || meta.url : urlLocal(id));
+  if (!r.pedidos) throw erro('A página não abriu a tempo — tenta outra vez.');
+  // Os ficheiros da cópia aparecem pelo caminho dentro da página (é isso que o editor procura).
+  for (const p of r.pesados) {
+    try { const u = new URL(p.url); p.nome = decodeURIComponent(u.pathname.split('/').pop()) || u.hostname; p.local = !original && u.hostname === '127.0.0.1'; } catch { p.nome = p.url; }
+  }
+  await comMeta(id, (m) => { m.velocidade = { ...(m.velocidade || {}), [original ? 'original' : 'copia']: { ...r, pesados: undefined } }; });
+  return r;
+}));
+
+app.post('/api/clones/:id/fotografar', rota(async (req, id) => {
+  const meta = await lerMeta(id);
+  if (!meta) throw erro('Página não encontrada.', 404);
+  if (!meta.spa) throw erro('Esta página já é editável.');
+  let html = await fotografar(urlLocal(id), meta.formato);
+  if (!html || html.length < 500) throw erro('A página não montou a tempo — tenta outra vez.');
+  html = html.split(`/p/${id}/`).join('/');
+  await guardarOriginal(id);
+  await writeFile(path.join(pastaDe(id), 'index.html'), html, 'utf8');
+  return comMeta(id, (m) => { m.fotografada = true; m.editadoEm = new Date().toISOString(); });
+}));
+
+// ── Biblioteca: nicho, etiquetas e notas de estudo de cada página.
+app.put('/api/clones/:id/biblioteca', rota((req, id) => comMeta(id, (m) => {
+  const b = req.body || {};
+  if ('nicho' in b) m.nicho = String(b.nicho || '').trim().slice(0, 40) || null;
+  if ('etiquetas' in b) {
+    m.etiquetas = [...new Set((Array.isArray(b.etiquetas) ? b.etiquetas : String(b.etiquetas).split(','))
+      .map((t) => String(t).trim().toLowerCase().slice(0, 30)).filter(Boolean))].slice(0, 12);
+  }
+  if ('notas' in b) m.notas = String(b.notas || '').slice(0, 8000);
+  if ('favorito' in b) m.favorito = Boolean(b.favorito);
+  if ('titulo' in b && String(b.titulo).trim()) m.titulo = String(b.titulo).trim().slice(0, 120);
+})));
+
+// O editor pergunta que tipo de link é cada botão (checkout, WhatsApp, outro).
+app.post('/api/classificar', (req, res) => {
+  const urls = (Array.isArray(req.body?.urls) ? req.body.urls : []).slice(0, 500);
+  res.json(urls.map((u) => classificar(String(u)) || { tipo: 'link', plataforma: '' }));
+});
 
 app.put('/api/clones/:id/mobile', rota((req, id) => comMeta(id, (m) => { m.mobile = Boolean(req.body?.ativo); })));
 

@@ -20,7 +20,7 @@ const NOMES_NOSSOS = /^(index\.html|index\.original\.html|meta\.json|thumb\.jpg|
 
 let browserPromise = null;
 
-function getBrowser() {
+export function getBrowser() {
   if (!browserPromise) {
     browserPromise = chromium.launch({
       // No PC usamos o Chrome instalado (BROWSER_CHANNEL=chrome); no servidor a
@@ -270,7 +270,7 @@ async function buscarEmFalta(context, guardados, html, urlFinal, recursos) {
 // voltarem a correr na cópia — animações, sliders, contadores, vídeos. Tiramos só
 // o que não queremos: rastreio, avisos de cookies e scripts anti-clone.
 
-const HOSTS_RASTREIO = [
+export const HOSTS_RASTREIO = [
   'connect.facebook.net', 'facebook.com/tr', 'googletagmanager.com', 'google-analytics.com', 'googleadservices.com',
   'doubleclick.net', 'analytics.tiktok.com', 's.pinimg.com', 'ct.pinterest.com', 'sc-static.net', 'clarity.ms',
   'static.hotjar.com', 'script.hotjar.com', 'utmify.com.br', 'kwai.net', 'snap.licdn.com', 'static.ads-twitter.com',

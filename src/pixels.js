@@ -3,11 +3,11 @@
 // por isso trocar um pixel não mexe na cópia.
 
 const DETECTORES = [
-  { plataforma: 'meta', padroes: [/fbq\(\s*['"]init['"]\s*,\s*['"]?(\d{8,20})/g, /facebook\.com\/tr\/?\?[^"'\s]*?\bid=(\d{8,20})/g] },
+  { plataforma: 'meta', padroes: [/fbq\(\s*['"]init['"]\s*,\s*['"]?(\d{8,20})/g, /facebook\.com\/tr\/?\?[^"'\s]*?\bid=(\d{8,20})/g, /connect\.facebook\.net\/signals\/config\/(\d{8,20})/g] },
   { plataforma: 'tiktok', padroes: [/ttq\.load\(\s*['"]([A-Z0-9]{15,30})['"]/g, /analytics\.tiktok\.com\/[^"'\s]*?sdkid=([A-Z0-9]{15,30})/g] },
   { plataforma: 'google', padroes: [/googletagmanager\.com\/gtag\/js\?id=((?:G|AW|UA|DC)-[A-Z0-9-]+)/gi, /gtag\(\s*['"]config['"]\s*,\s*['"]((?:G|AW|UA|DC)-[A-Z0-9-]+)/gi] },
   { plataforma: 'gtm', padroes: [/\b(GTM-[A-Z0-9]{4,10})\b/g] },
-  { plataforma: 'kwai', padroes: [/kwaiq\.load\(\s*['"]?(\d{6,25})/g, /kwaiq\.instance\(\s*['"]?(\d{6,25})/g] },
+  { plataforma: 'kwai', padroes: [/kwaiq\.load\(\s*['"]?(\d{6,25})/g, /kwaiq\.instance\(\s*['"]?(\d{6,25})/g, /kwai\.net\/[^"'\s]*?sdkid=(\d{6,25})/g] },
   { plataforma: 'pinterest', padroes: [/pintrk\(\s*['"]load['"]\s*,\s*['"]?(\d{8,20})/g, /ct\.pinterest\.com\/v3\/?\?[^"'\s]*?\btid=(\d{8,20})/g] },
   { plataforma: 'snapchat', padroes: [/snaptr\(\s*['"]init['"]\s*,\s*['"]([0-9a-f-]{20,40})/gi] },
   { plataforma: 'utmify', padroes: [/window\.pixelId\s*=\s*['"]([A-Za-z0-9]{8,40})['"]/g] },
