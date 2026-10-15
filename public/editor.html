@@ -24,6 +24,7 @@
   </header>
 
   <nav class="ed-abas" id="ed-abas">
+    <button data-aba="passos" id="aba-passos" hidden>🧩 Passos</button>
     <button data-aba="texto" class="ativa">✏️ Textos</button>
     <button data-aba="imagens">🖼️ Imagens</button>
     <button data-aba="botoes">🔘 Botões</button>
@@ -47,6 +48,33 @@
         Posso guardá-la como página normal: fica igual à vista, mas efeitos feitos por código (quiz, contadores) podem parar.
         <button class="principal" id="ed-fotografar">Tornar editável</button>
       </div>
+
+      <!-- Passos do quiz -->
+      <section data-painel="passos" hidden>
+        <h3>Passos do quiz</h3>
+        <p class="ed-dica">Escolhe um passo para o ver. Os textos, imagens e botões desse passo editam-se nos outros separadores. Reescreve as perguntas com as tuas palavras.</p>
+        <div class="ed-grupo" id="qz-atual">
+          <h4 id="qz-titulo"></h4>
+          <label class="ed-campo">O que faz avançar
+            <select id="qz-tipo">
+              <option value="opcoes">Clicar numa resposta</option>
+              <option value="multi">Escolher respostas + botão</option>
+              <option value="cta">Só um botão</option>
+              <option value="campos">Preencher campos + botão</option>
+              <option value="auto">Avança sozinho</option>
+              <option value="final">Último passo (oferta)</option>
+            </select>
+          </label>
+          <label class="ed-campo" id="qz-auto-l">Segundos até avançar <input type="number" id="qz-auto" min="1" max="30" step="0.5"></label>
+          <div class="ed-accoes">
+            <button id="qz-cima">↑ Subir</button>
+            <button id="qz-baixo">↓ Descer</button>
+            <button id="qz-duplicar">⧉ Duplicar</button>
+            <button id="qz-apagar" class="perigo">🗑 Apagar</button>
+          </div>
+        </div>
+        <ol id="qz-lista" class="qz-lista"></ol>
+      </section>
 
       <!-- Textos -->
       <section data-painel="texto">

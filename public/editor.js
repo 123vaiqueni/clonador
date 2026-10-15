@@ -57,6 +57,7 @@ function modoClique() {
   doc.documentElement.toggleAttribute('data-ed-escolher', ['imagens', 'botoes', 'elemento', 'provas'].includes(aba));
 }
 function redesenharAba() {
+  if (aba === 'passos') desenharPassos();
   if (aba === 'cores') desenharPaleta();
   if (aba === 'imagens') desenharImagens();
   if (aba === 'botoes') desenharBotoes();
@@ -90,6 +91,11 @@ async function carregar() {
   $('#ed-abrir').href = `/p/${id}/`;
   $('#mob-ativo').checked = Boolean(meta.mobile);
   $('#ed-app').hidden = !bloqueada();
+  // Quiz: abre no separador dos passos.
+  if (ehQuiz() && $('#aba-passos').hidden) {
+    $('#aba-passos').hidden = false;
+    $('#aba-passos').click();
+  }
   frame.src = `/p/${id}/?cru=1&t=${Date.now()}`;
 }
 
@@ -99,7 +105,8 @@ const CSS_EDITOR = `[data-ed-sel]{outline:3px solid #e8590c!important;outline-of
 [data-ed-hl]{outline:3px solid #1c7ed6!important;outline-offset:2px}
 [contenteditable=true] *:hover{outline:1px dashed #e8590c80}
 html[data-ed-escolher] body *:hover{outline:2px dashed #e8590ccc;cursor:pointer}
-.elementor-invisible,[data-aos],.wow,.animated,.reveal,.fade-in,[class*="animate__"]{visibility:visible!important;opacity:1!important;transform:none!important}`;
+.elementor-invisible,[data-aos],.wow,.animated,.reveal,.fade-in,[class*="animate__"]{visibility:visible!important;opacity:1!important;transform:none!important}
+[data-quiz-passo]{display:none!important}[data-quiz-passo][data-ed-ver]{display:contents!important}`;
 
 frame.addEventListener('load', () => {
   doc = frame.contentDocument;
@@ -120,7 +127,101 @@ frame.addEventListener('load', () => {
   historico.length = 0;
   $('#ed-desfazer').disabled = true;
   sel = null;
+  if (ehQuiz()) verPasso(Math.min(passoVisto, passosQuiz().length - 1), false);
   redesenharAba();
+});
+
+// ── Passos do quiz: um passo à vista de cada vez (data-ed-ver, só no editor).
+const ehQuiz = () => meta?.modo === 'quiz' || Boolean(doc?.querySelector('[data-quiz-passo]'));
+const passosQuiz = () => (doc ? [...doc.body.querySelectorAll('[data-quiz-passo]')] : []);
+let passoVisto = 0;
+const TIPOS_PASSO = { opcoes: 'resposta avança', multi: 'respostas + botão', cta: 'botão', campos: 'campos + botão', auto: 'sozinho', final: 'oferta (último)' };
+
+function verPasso(k, redesenhar = true) {
+  const lista = passosQuiz();
+  if (!lista.length) return;
+  passoVisto = Math.max(0, Math.min(k, lista.length - 1));
+  lista.forEach((p, i) => p.toggleAttribute('data-ed-ver', i === passoVisto));
+  frame.contentWindow?.scrollTo(0, 0);
+  sel?.removeAttribute('data-ed-sel'); sel = null;
+  if (redesenhar) redesenharAba();
+}
+function desenharPassos() {
+  const lista = passosQuiz();
+  const p = lista[passoVisto];
+  $('#qz-atual').hidden = !p;
+  if (p) {
+    $('#qz-titulo').textContent = `Passo ${passoVisto + 1} de ${lista.length}`;
+    $('#qz-tipo').value = p.getAttribute('data-quiz-tipo') || 'opcoes';
+    $('#qz-auto-l').hidden = $('#qz-tipo').value !== 'auto';
+    $('#qz-auto').value = ((+p.getAttribute('data-quiz-auto') || 3000) / 1000).toString();
+  }
+  $('#qz-lista').innerHTML = lista.map((q, i) => {
+    const foto = q.getAttribute('data-quiz-foto');
+    const titulo = q.querySelector('h1,h2,h3')?.innerText?.trim() || q.getAttribute('data-quiz-titulo') || '';
+    return `<li data-i="${i}" class="${i === passoVisto ? 'ativo' : ''}">
+      ${foto ? `<img src="/p/${id}/passos/${encodeURIComponent(foto)}.jpg" alt="" loading="lazy">` : ''}
+      <span class="qz-n">${i + 1}</span>
+      <span class="qz-txt"><b>${esc(titulo.slice(0, 90))}</b><small>${TIPOS_PASSO[q.getAttribute('data-quiz-tipo')] || ''}</small></span>
+    </li>`;
+  }).join('');
+  $('#qz-lista').querySelector('li.ativo')?.scrollIntoView({ block: 'nearest' });
+}
+$('#qz-lista').addEventListener('click', (e) => {
+  const li = e.target.closest('[data-i]');
+  if (li) verPasso(Number(li.dataset.i));
+});
+$('#qz-tipo').addEventListener('change', (e) => {
+  const p = passosQuiz()[passoVisto];
+  if (!p) return;
+  marcar();
+  const tipo = e.target.value;
+  p.setAttribute('data-quiz-tipo', tipo);
+  if (tipo === 'auto') { if (!p.getAttribute('data-quiz-auto')) p.setAttribute('data-quiz-auto', '3000'); }
+  else p.removeAttribute('data-quiz-auto');
+  // Respostas que passam a avançar o quiz: todas as opções clicáveis do passo.
+  if ((tipo === 'opcoes' || tipo === 'multi') && !p.querySelector('[data-quiz-opcao]')) {
+    p.querySelectorAll('button,[role=button],label,[data-clon-i]').forEach((el) => { if (!el.closest('[data-quiz-ir]')) el.setAttribute('data-quiz-opcao', ''); });
+  }
+  if (tipo !== 'final' && tipo !== 'opcoes' && tipo !== 'auto' && !p.querySelector('[data-quiz-ir="seguinte"]')) {
+    estado('Este passo não tem botão para avançar: em Blocos, escolhe o botão e muda o link para “#seguinte”.', 'erro');
+  }
+  desenharPassos();
+});
+$('#qz-auto').addEventListener('change', (e) => {
+  const p = passosQuiz()[passoVisto];
+  const s = Math.min(30, Math.max(1, Number(e.target.value) || 3));
+  if (p) { marcar(); p.setAttribute('data-quiz-auto', String(Math.round(s * 1000))); }
+});
+$('#qz-cima').addEventListener('click', () => {
+  const p = passosQuiz()[passoVisto];
+  const ant = p?.previousElementSibling;
+  if (!ant?.hasAttribute('data-quiz-passo')) return;
+  marcar(); ant.before(p); verPasso(passoVisto - 1);
+});
+$('#qz-baixo').addEventListener('click', () => {
+  const p = passosQuiz()[passoVisto];
+  const prox = p?.nextElementSibling;
+  if (!prox?.hasAttribute('data-quiz-passo')) return;
+  marcar(); prox.after(p); verPasso(passoVisto + 1);
+});
+$('#qz-duplicar').addEventListener('click', () => {
+  const p = passosQuiz()[passoVisto];
+  if (!p) return;
+  marcar();
+  const c = p.cloneNode(true);
+  c.classList.remove('ativo');
+  p.after(c);
+  verPasso(passoVisto + 1);
+  estado('✓ Passo duplicado — muda a pergunta e as respostas com as tuas palavras.', 'ok');
+});
+$('#qz-apagar').addEventListener('click', () => {
+  const lista = passosQuiz();
+  if (lista.length < 2) return estado('O quiz precisa de pelo menos um passo.', 'erro');
+  marcar();
+  lista[passoVisto].remove();
+  verPasso(Math.min(passoVisto, lista.length - 2));
+  estado('Passo apagado (↶ desfaz).', 'ok');
 });
 
 let escolherAncora = null; // função a chamar com a secção escolhida
@@ -239,7 +340,7 @@ function listaImagens() {
     if (el.tagName === 'IMG' && r.width * r.height > 0 && r.width * r.height < 900) continue; // ícones e pixels
     lista.push({ el, src, topo: r.height ? r.top + y : Infinity, visivel: r.width > 0 && r.height > 0, w: Math.round(r.width), h: Math.round(r.height) });
   }
-  return lista.sort((a, b) => a.topo - b.topo);
+  return lista.filter((im) => !ehQuiz() || im.visivel).sort((a, b) => a.topo - b.topo);
 }
 
 let imagens = [];
@@ -330,6 +431,8 @@ let botoes = [];
 let tipos = new Map(); // url -> {tipo, plataforma}
 
 function destinoDe(el) {
+  const qi = el.getAttribute('data-quiz-ir');
+  if (qi) return '#' + qi;
   if (el.tagName === 'A') return el.getAttribute('href') || '';
   const oc = el.getAttribute('onclick') || '';
   const m = oc.match(/(?:location(?:\.href)?\s*=|window\.open\(|location\.assign\()\s*['"]([^'"]+)['"]/) || oc.match(/getElementById\(['"]([^'"]+)['"]\)/);
@@ -338,6 +441,14 @@ function destinoDe(el) {
   return f?.getAttribute('action') || '';
 }
 function pôrDestino(el, url) {
+  // Quiz: "#seguinte" / "#anterior" fazem do botão o avanço (ou recuo) do quiz.
+  if (url === '#seguinte' || url === '#anterior') {
+    el.setAttribute('data-quiz-ir', url.slice(1));
+    el.removeAttribute('onclick'); el.removeAttribute('disabled');
+    if (el.tagName === 'A') el.setAttribute('href', '#');
+    return;
+  }
+  el.removeAttribute('data-quiz-ir');
   if (el.tagName === 'A') {
     el.setAttribute('href', url);
     if (url.startsWith('#')) el.removeAttribute('target');
@@ -359,6 +470,8 @@ async function desenharBotoes() {
   const conjunto = new Set(todos);
   // Um botão dentro de um link conta uma vez só.
   botoes = todos.filter((el) => { const pai = el.parentElement?.closest(SELETOR_CLICAVEL); return !pai || !conjunto.has(pai); })
+    // No quiz só conta o passo que está à vista.
+    .filter((el) => !ehQuiz() || el.getClientRects().length)
     .map((el) => ({ el, destino: destinoDe(el), texto: textoDe(el) }))
     .filter((b) => b.texto || b.destino);
   const novos = [...new Set(botoes.map((b) => b.destino).filter((u) => /^https?:/i.test(u) && !tipos.has(u)))];
@@ -374,12 +487,14 @@ async function desenharBotoes() {
       : /^(https?:|tel:|mailto:)/i.test(b.destino) ? (t?.tipo || 'link') : b.destino ? 'link' : 'vazio';
     b.compra = b.tipo === 'checkout' || b.tipo === 'whatsapp'
       || PALAVRAS_COMPRA.test(b.texto) || /btn|button|botao|cta/i.test(String(b.el.className));
+    // Respostas e "Continuar" do quiz: quem os move é o motor do quiz, não um link.
+    if (b.el.closest('[data-quiz-opcao],[data-quiz-ir]')) { b.tipo = 'quiz'; b.compra = false; }
   }
   const compra = botoes.filter((b) => b.compra);
   const outros = botoes.filter((b) => !b.compra);
   const linha = (b) => {
     const i = botoes.indexOf(b);
-    const tag = { checkout: '💳 checkout', whatsapp: '💬 WhatsApp', ancora: '⚓ secção', vazio: '🚫 sem link', link: '🔗 link' }[b.tipo];
+    const tag = { checkout: '💳 checkout', whatsapp: '💬 WhatsApp', ancora: '⚓ secção', vazio: '🚫 sem link', link: '🔗 link', quiz: '🧩 avança o quiz' }[b.tipo];
     return `<div class="bt-item ${b.tipo}" data-i="${i}">
       <div class="bt-cab"><span class="px-tag">${tag}</span><span class="bt-texto">${esc(b.texto || '(sem texto)')}</span></div>
       <input class="bt-href" data-i="${i}" value="${esc(b.destino)}" placeholder="https://…">
@@ -865,6 +980,13 @@ async function guardar() {
   copia.removeAttribute('data-ed-escolher');
   copia.querySelectorAll('[data-ed-sel],[data-ed-hl]').forEach((x) => { x.removeAttribute('data-ed-sel'); x.removeAttribute('data-ed-hl'); });
   copia.querySelector('body')?.removeAttribute('contenteditable');
+  // Quiz: o visitante começa sempre no primeiro passo.
+  copia.querySelectorAll('[data-quiz-passo]').forEach((p, k) => {
+    p.removeAttribute('data-ed-ver');
+    p.setAttribute('data-quiz-passo', String(k));
+    p.classList.toggle('ativo', k === 0);
+    if (!p.getAttribute('class')) p.removeAttribute('class');
+  });
   const dt = doc.doctype ? `<!doctype ${doc.doctype.name}>\n` : '<!doctype html>\n';
   if (mudou) await api(`/api/clones/${id}/html`, { method: 'PUT', body: JSON.stringify({ html: dt + copia.outerHTML }) });
   await guardarCodigo();

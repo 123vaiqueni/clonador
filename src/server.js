@@ -6,6 +6,7 @@ import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clonar } from './clone.js';
+import { clonarQuiz } from './quiz.js';
 import { injectarPixels, removerPixel, validarMeusPixels } from './pixels.js';
 import { aplicarSubstituicoes, classificar, extrairLinks, linkWhatsApp, validarSubstituicoes } from './links.js';
 import { netlifyLigado, publicarNetlify, zipEmMemoria } from './publicar.js';
@@ -278,15 +279,50 @@ app.get('/api/clones', async (req, res) => {
 });
 
 let emCurso = 0;
+const mensagemErro = (err) => (/Timeout/i.test(err.message)
+  ? 'A página demorou demasiado a abrir. Tenta outra vez ou confirma o link.'
+  : /net::ERR_NAME_NOT_RESOLVED/.test(err.message) ? 'Não encontrei esse site. Confirma o link.'
+  : err.message.split('\n')[0]);
+
+// Quiz completo: demora (um ecrã de cada vez), por isso corre em fundo e o painel
+// pergunta o progresso em /api/trabalhos/<id>.
+const trabalhos = new Map();
+app.get('/api/trabalhos/:id', (req, res) => {
+  const t = trabalhos.get(req.params.id);
+  if (!t) return res.status(404).json({ erro: 'Trabalho não encontrado (o servidor pode ter reiniciado).' });
+  res.json(t);
+});
+
 app.post('/api/clones', async (req, res) => {
   if (emCurso >= 2) return res.status(429).json({ erro: 'Já estou a clonar duas páginas. Espera uns segundos.' });
+  const { url, formato, modo, removerPopups, escolhas } = req.body || {};
+  const fmt = formato === 'computador' ? 'computador' : 'telemovel';
   emCurso++;
   const inicio = Date.now();
+  if (modo === 'quiz') {
+    const tid = randomBytes(6).toString('hex');
+    const t = { id: tid, estado: 'a correr', progresso: 'A abrir o quiz…', inicio };
+    trabalhos.set(tid, t);
+    res.status(202).json({ trabalho: tid });
+    clonarQuiz({ url, formato: fmt, dataDir: DATA_DIR, escolhas: escolhas || {}, aoProgredir: (p) => { t.progresso = p; } })
+      .then((meta) => {
+        console.log(`[quiz] ${meta.id} ${meta.url} ${meta.quiz.passos.length} passos em ${Date.now() - inicio}ms`);
+        Object.assign(t, { estado: 'pronto', meta });
+      })
+      .catch((err) => {
+        console.error('[quiz] falhou:', err.stack || err.message);
+        Object.assign(t, { estado: 'erro', erro: mensagemErro(err) });
+      })
+      .finally(() => {
+        emCurso--;
+        setTimeout(() => trabalhos.delete(tid), 30 * 60 * 1000);
+      });
+    return;
+  }
   try {
-    const { url, formato, modo, removerPopups } = req.body || {};
     const meta = await clonar({
       url,
-      formato: formato === 'computador' ? 'computador' : 'telemovel',
+      formato: fmt,
       modo: modo === 'estatica' ? 'estatica' : 'movimento',
       removerPopups: removerPopups !== false,
       dataDir: DATA_DIR,
@@ -295,11 +331,7 @@ app.post('/api/clones', async (req, res) => {
     res.json(meta);
   } catch (err) {
     console.error('[clone] falhou:', err.stack || err.message);
-    const msg = /Timeout/i.test(err.message)
-      ? 'A página demorou demasiado a abrir. Tenta outra vez ou confirma o link.'
-      : /net::ERR_NAME_NOT_RESOLVED/.test(err.message) ? 'Não encontrei esse site. Confirma o link.'
-      : err.message.split('\n')[0];
-    res.status(400).json({ erro: msg });
+    res.status(400).json({ erro: mensagemErro(err) });
   } finally {
     emCurso--;
   }

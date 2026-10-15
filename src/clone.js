@@ -11,9 +11,9 @@ import { isIP } from 'node:net';
 import path from 'node:path';
 import { detectarPixels, removerPixel } from './pixels.js';
 
-const MAX_ASSET_BYTES = 15 * 1024 * 1024;   // vídeos grandes ficam no site original
-const MAX_TOTAL_BYTES = 150 * 1024 * 1024;
-const TIPOS_GUARDADOS = new Set(['stylesheet', 'image', 'font', 'media']);
+export const MAX_ASSET_BYTES = 15 * 1024 * 1024;   // vídeos grandes ficam no site original
+export const MAX_TOTAL_BYTES = 150 * 1024 * 1024;
+export const TIPOS_GUARDADOS = new Set(['stylesheet', 'image', 'font', 'media']);
 const TIPOS_APP = new Set(['script', 'fetch', 'xhr', 'manifest', 'other']);
 // Nomes que a pasta da página já usa — um ficheiro do site com estes nomes não é espelhado.
 const NOMES_NOSSOS = /^(index\.html|index\.original\.html|meta\.json|thumb\.jpg|original\/)/;
@@ -64,7 +64,7 @@ export async function validarUrl(bruto) {
   return url.toString();
 }
 
-function extensao(url, contentType = '') {
+export function extensao(url, contentType = '') {
   const ct = contentType.split(';')[0].trim();
   const porTipo = {
     'text/css': '.css', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
@@ -79,7 +79,7 @@ function extensao(url, contentType = '') {
 }
 
 // Resolve url(...) e @import dentro de CSS contra a morada de onde o CSS veio.
-function reescreverCss(css, baseUrl, mapear) {
+export function reescreverCss(css, baseUrl, mapear) {
   return css
     .replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (inteiro, aspa, alvo) => {
       if (/^(data:|#|about:)/i.test(alvo.trim())) return inteiro;
@@ -98,13 +98,13 @@ function reescreverCss(css, baseUrl, mapear) {
     });
 }
 
-function escaparRegex(s) {
+export function escaparRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Corre dentro da página: tira popups, banners de cookies e janelas de país/newsletter
 // que ficavam congelados na cópia (sem scripts já não fecham).
-function tirarPopups() {
+export function tirarPopups() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const removidos = [];
@@ -223,7 +223,7 @@ function prepararDom(manterScripts) {
 
 // Imagens e fontes que a página referencia mas o browser não chegou a pedir
 // (outros tamanhos de ecrã, estados hover, fontes de outras línguas…).
-async function buscarEmFalta(context, guardados, html, urlFinal, recursos) {
+export async function buscarEmFalta(context, guardados, html, urlFinal, recursos) {
   const faltam = new Set();
   const juntar = (u, base) => {
     try {

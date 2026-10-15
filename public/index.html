@@ -30,6 +30,7 @@
         <span class="seg" title="Com movimento: animações, sliders e contadores funcionam (sem os pixels deles). Estática: uma fotografia fiel, sem scripts.">
           <label><input type="radio" name="modo" value="movimento" checked><span>✨ Com movimento</span></label>
           <label><input type="radio" name="modo" value="estatica"><span>📷 Estática</span></label>
+          <label title="Responde ao quiz sozinho, do primeiro passo até à oferta, e guarda cada ecrã para editares."><input type="radio" name="modo" value="quiz"><span>🧩 Quiz completo</span></label>
         </span>
         <label title="Tira janelas de cookies, newsletter e escolha de país que ficariam presas na cópia.">
           <input type="checkbox" id="popups" checked> Tirar popups
@@ -154,7 +155,7 @@
           <a class="thumb" href="/p/${c.id}/" target="_blank" style="background-image:url('/p/${c.id}/thumb.jpg')"></a>
           <div class="corpo">
             <div class="titulo"><button class="link fav ${c.favorito ? 'on' : ''}" data-fav="${c.id}" title="Favorita">${c.favorito ? '★' : '☆'}</button>${esc(c.titulo)}</div>
-            <div class="origem" title="${esc(c.url)}">${esc(new URL(c.url).hostname)} · ${c.formato === 'computador' ? '💻' : '📱'} · ${c.modo === 'estatica' ? '📷' : c.spa ? '⚛️' : '✨'} · ${tamanho(c.bytes)}${c.editadoEm ? ' · ✏️ editada' : ''}</div>
+            <div class="origem" title="${esc(c.url)}">${esc(new URL(c.url).hostname)} · ${c.formato === 'computador' ? '💻' : '📱'} · ${c.modo === 'estatica' ? '📷' : c.modo === 'quiz' ? `🧩 ${c.quiz?.passos?.length || ''} passos` : c.spa ? '⚛️' : '✨'} · ${tamanho(c.bytes)}${c.editadoEm ? ' · ✏️ editada' : ''}</div>
             ${c.nicho || c.etiquetas?.length ? `<div class="etiquetas">${c.nicho ? `<span class="nicho">${esc(c.nicho)}</span>` : ''}${(c.etiquetas || []).map((t) => `<span>${esc(t)}</span>`).join('')}</div>` : ''}
             ${c.notas ? `<div class="notas" title="${esc(c.notas)}">📝 ${esc(c.notas.split(/\n/).find((l) => l.trim()) || '').slice(0, 90)}</div>` : ''}
             ${publicadoEm(c)}
@@ -176,21 +177,33 @@
       const botao = $('#botao');
       botao.disabled = true;
       const inicio = Date.now();
-      mostrar('<span class="giro"></span> A abrir a página e a copiar tudo… (pode levar até 1 minuto)');
+      const modo = document.querySelector('input[name=modo]:checked').value;
+      mostrar(modo === 'quiz'
+        ? '<span class="giro"></span> A responder ao quiz passo a passo… (1 a 3 minutos)'
+        : '<span class="giro"></span> A abrir a página e a copiar tudo… (pode levar até 1 minuto)');
       try {
-        const c = await api('/api/clones', {
+        let c = await api('/api/clones', {
           method: 'POST',
           body: JSON.stringify({
             url: $('#url').value.trim(),
             formato: document.querySelector('input[name=formato]:checked').value,
-            modo: document.querySelector('input[name=modo]:checked').value,
+            modo,
             removerPopups: $('#popups').checked,
           }),
         });
+        // Quiz: corre em fundo; vamos perguntando em que passo vai.
+        while (c.trabalho) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const t = await api(`/api/trabalhos/${c.trabalho}`);
+          if (t.estado === 'erro') throw new Error(t.erro);
+          if (t.estado === 'pronto') c = t.meta;
+          else mostrar(`<span class="giro"></span> ${esc(t.progresso)} · ${Math.round((Date.now() - inicio) / 1000)}s`);
+        }
         const extra = [
+          c.quiz ? `${c.quiz.passos.length} passos do quiz` : '',
           c.pixelsOriginais?.length ? `${c.pixelsOriginais.length} pixels deles removidos` : '',
         ].filter(Boolean).join(' · ');
-        mostrar(`✓ Clonada em ${Math.round((Date.now() - inicio) / 1000)}s — ${c.ficheiros} ficheiros${extra ? ' · ' + extra : ''}. <a href="/p/${c.id}/" target="_blank">Abrir</a>${c.aviso ? `<br><span class="px-aviso">${esc(c.aviso)}</span>` : ''}`, 'ok');
+        mostrar(`✓ Clonada em ${Math.round((Date.now() - inicio) / 1000)}s — ${c.ficheiros} ficheiros${extra ? ' · ' + extra : ''}. <a href="/p/${c.id}/" target="_blank">Abrir</a> · <a href="/editor.html?id=${c.id}">Editar</a>${c.aviso ? `<br><span class="px-aviso">${esc(c.aviso)}</span>` : ''}`, 'ok');
         $('#url').value = '';
         carregar();
       } catch (err) {
